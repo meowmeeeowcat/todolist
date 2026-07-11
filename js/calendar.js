@@ -10,19 +10,75 @@ const firebaseConfig = {
     appId: "1:784814496491:web:330a8ccf2c312e224fbcae"
 };
 
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
 const db = firebase.database();
 
 let globalAppData = { template: {}, tempTasks: [] };
+let weeklyDataStore = {};
 let userDbRef = null;
 // =======================================================
+
 const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const monthNames = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
 const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
 
 let currentActiveView = 'months'; 
 let selectedDateStr = "";
+
+function calculateMainItems(weekKey) {
+    weeklyDataStore[weekKey] = {};
+    const template = globalAppData.template || {};
+    
+    for (let mainKey in template) {
+        weeklyDataStore[weekKey][mainKey] = { total: 0, completed: 0, subItems: {} };
+        const subItems = template[mainKey].subItems || {};
+        for (let subKey in subItems) {
+            const total = subItems[subKey].total || 0;
+            weeklyDataStore[weekKey][mainKey].total += total;
+            weeklyDataStore[weekKey][mainKey].subItems[subKey] = { total: total, completed: 0, isTemp: false };
+        }
+    }
+
+    const tempTasks = globalAppData.tempTasks || [];
+    tempTasks.forEach(task => {
+        if (task.date) {
+            const d = new Date(task.date);
+            let totalDays = d.getDate();
+            for (let i = 0; i < d.getMonth(); i++) totalDays += daysInMonths[i];
+            const w = Math.ceil((totalDays + 3) / 7);
+            const computedWeekKey = `第 ${w} 週`;
+
+            if (computedWeekKey === weekKey) {
+                const cat = task.category || "臨時任務";
+                if (!weeklyDataStore[weekKey][cat]) {
+                    weeklyDataStore[weekKey][cat] = { total: 0, completed: 0, subItems: {} };
+                }
+                weeklyDataStore[weekKey][cat].total += (task.total || 0);
+                weeklyDataStore[weekKey][cat].completed += (task.completed || 0);
+                weeklyDataStore[weekKey][cat].subItems[task.name] = {
+                    total: task.total,
+                    completed: task.completed,
+                    isTemp: true
+                };
+            }
+        }
+    });
+}
+
+function getWeekCompletionRate(weekKey) {
+    calculateMainItems(weekKey);
+    const weekData = weeklyDataStore[weekKey] || {};
+    let total = 0;
+    let completed = 0;
+    for (let key in weekData) {
+        total += weekData[key].total || 0;
+        completed += weekData[key].completed || 0;
+    }
+    return total > 0 ? (completed / total) : 0;
+}
 
 function getWeekNumberFor2026(monthIndex, day) {
     let totalDays = day;
@@ -46,34 +102,18 @@ function switchView(viewType) {
     document.getElementById('weeks-view-container').classList.toggle('hidden', viewType !== 'weeks');
 }
 
-// 輔助函數：安全取得與主頁完全一致的馬卡龍色彩
 function getSafeMacaronColor(groupName, fallbackColor) {
-    // 預設灰色給臨時任務
     if (groupName === '臨時任務') return '#94a3b8';
-
-    // 1. 嘗試從 app.js 的全域調色盤 fixedPalette 尋找匹配
-    const palette = window.fixedPalette || [];
-    
     if (globalAppData && globalAppData.template && globalAppData.template[groupName]) {
         const hue = globalAppData.template[groupName].customHue;
-        if (hue !== undefined) {
-            const matched = palette.find(p => p.hue === hue);
-            if (matched) return matched.color;
-            // 2. 如果是自訂色相，使用馬卡龍專屬的高明度與柔和飽和度公式 (Lightness: 85%) 確保風格統一
-            return `hsl(${hue}, 100%, 85%)`;
-        }
+        if (hue !== undefined) return `hsl(${hue}, 100%, 85%)`;
     }
-
-    // 3. 備用方案：如果 template 找不到 (可能是歷史被刪除的分類)，檢查寫死名稱或原色彩
-    if (groupName === '學習') return '#bae1ff'; // 馬卡龍晴空藍
-    if (groupName === '運動') return '#aefff5'; // 馬卡龍湖水綠
-    if (groupName === '家務') return '#ffdfba'; // 馬卡龍活力橙
-    
-    return fallbackColor || '#e8bfff'; // 預設馬卡龍薰衣草紫
+    return fallbackColor || '#bae1ff';
 }
 
 function renderMonthsCalendar(todayStr) {
     const container = document.getElementById('months-view-container');
+    if (!container) return;
     container.innerHTML = '';
     let currentFirstDayOfWeek = 4; // 2026-01-01 是週四
 
@@ -103,8 +143,7 @@ function renderMonthsCalendar(todayStr) {
 
             html += `
                 <div class="day-cell ${rateClass} ${isToday} ${isSelected}" 
-                     data-date="${dateStr}" data-week="第 ${weekNum} 週" 
-                     title="${dateStr} ${isToday ? '(今天)' : ''}\n屬於：第 ${weekNum} 週\n該週進度: ${Math.round(rate*100)}%">
+                     data-date="${dateStr}" data-week="第 ${weekNum} 週">
                     ${d}
                 </div>
             `;
@@ -118,11 +157,8 @@ function renderMonthsCalendar(todayStr) {
     container.querySelectorAll('.day-cell').forEach(cell => {
         cell.addEventListener('click', () => {
             container.querySelectorAll('.day-cell').forEach(c => c.classList.remove('is-selected'));
-            document.getElementById('weeks-view-container').querySelectorAll('.week-box-btn').forEach(c => c.classList.remove('is-selected'));
-            
             selectedDateStr = cell.getAttribute('data-date');
             cell.classList.add('is-selected');
-            
             showDateDetails(selectedDateStr, cell.getAttribute('data-week'));
         });
     });
@@ -130,6 +166,7 @@ function renderMonthsCalendar(todayStr) {
 
 function renderWeeksCalendar() {
     const container = document.getElementById('weeks-view-container');
+    if (!container) return;
     container.innerHTML = '';
 
     for (let w = 1; w <= 53; w++) {
@@ -148,8 +185,6 @@ function renderWeeksCalendar() {
 
         weekCard.addEventListener('click', () => {
             container.querySelectorAll('.week-box-btn').forEach(c => c.classList.remove('is-selected'));
-            document.getElementById('months-view-container').querySelectorAll('.day-cell').forEach(c => c.classList.remove('is-selected'));
-            
             weekCard.classList.add('is-selected');
             showWeekWholeDetails(weekKey);
         });
@@ -159,22 +194,27 @@ function renderWeeksCalendar() {
 }
 
 function showDateDetails(dateStr, weekKey) {
-    document.getElementById('focus-date-title').innerText = `檢視日期：${dateStr}`;
-    document.getElementById('focus-date-week-hint').innerText = `所屬週次：${weekKey}`;
+    const titleEl = document.getElementById('focus-date-title');
+    const hintEl = document.getElementById('focus-date-week-hint');
+    const detailsEl = document.getElementById('focus-date-details');
+    
+    if (titleEl) titleEl.innerText = `檢視日期：${dateStr}`;
+    if (hintEl) hintEl.innerText = `所屬週次：${weekKey}`;
     
     calculateMainItems(weekKey);
     const weekData = weeklyDataStore[weekKey] || {};
     let html = "";
 
     html += `<h4 style="margin: 5px 0; color: #1a4d6c;">當天專屬臨時任務：</h4>`;
-    const specificTempTasks = globalAppData.tempTasks.filter(t => t.date === dateStr);
+    const tempTasksList = globalAppData.tempTasks || [];
+    const specificTempTasks = tempTasksList.filter(t => t.date === dateStr);
     
     if (specificTempTasks.length === 0) {
         html += `<div class="detail-item" style="color:#777; font-style:italic;">本日無排定臨時指派任務。</div>`;
     } else {
         specificTempTasks.forEach(task => {
             html += `
-                <div class="detail-item detail-item-box" style="border-left:5px solid ${task.color || '#64748b'}">
+                <div class="detail-item detail-item-box" style="border-left:3px solid ${task.color || '#64748b'}">
                     <b>${task.name}</b> <br>
                     狀態：${task.completed >= task.total ? '已完成' : '進行中'} (${task.completed}/${task.total}次)
                 </div>
@@ -188,9 +228,7 @@ function showDateDetails(dateStr, weekKey) {
         hasRegular = true;
         const mainItem = weekData[mainKey];
         const percent = mainItem.total > 0 ? Math.round((mainItem.completed / mainItem.total) * 100) : 0;
-        
-        // 安全引入對齊函數
-        const displayColor = getSafeMacaronColor(mainKey, mainItem.color);
+        const displayColor = getSafeMacaronColor(mainKey, '#bae1ff');
 
         html += `
             <div class="regular-progress-item">
@@ -199,14 +237,17 @@ function showDateDetails(dateStr, weekKey) {
             </div>
         `;
     }
-    if(!hasRegular) html += `<div style="color:#999; font-size:14px;">本週無任何常規任務範本。</div>`;
-
-    document.getElementById('focus-date-details').innerHTML = html;
+    if(!hasRegular) html += `<div style="color:#999; font-size:14px;">本週無任何常規任務。</div>`;
+    if (detailsEl) detailsEl.innerHTML = html;
 }
 
 function showWeekWholeDetails(weekKey) {
-    document.getElementById('focus-date-title').innerText = `檢視：${weekKey}`;
-    document.getElementById('focus-date-week-hint').innerText = `整個禮拜的任務分布總覽`;
+    const titleEl = document.getElementById('focus-date-title');
+    const hintEl = document.getElementById('focus-date-week-hint');
+    const detailsEl = document.getElementById('focus-date-details');
+
+    if (titleEl) titleEl.innerText = `檢視：${weekKey}`;
+    if (hintEl) hintEl.innerText = `整個禮拜的任務分布總覽`;
     
     calculateMainItems(weekKey);
     const weekData = weeklyDataStore[weekKey] || {};
@@ -224,104 +265,60 @@ function showWeekWholeDetails(weekKey) {
             `;
         }
     }
-    document.getElementById('focus-date-details').innerHTML = html;
+    if (detailsEl) detailsEl.innerHTML = html;
 }
 
 function calculateAnnualSummaryStats() {
     const container = document.getElementById('annual-stats-classified-container');
     if (!container) return;
     container.innerHTML = '';
-
     const classifiedCounters = {};
 
     for (let w = 1; w <= 53; w++) {
         const weekKey = `第 ${w} 週`;
-        
-        if (typeof calculateMainItems === "function") {
-            calculateMainItems(weekKey);
-        }
-        
+        calculateMainItems(weekKey);
         const weekData = weeklyDataStore[weekKey] || {};
-        
         for (let mainKey in weekData) {
-            if (!classifiedCounters[mainKey]) {
-                classifiedCounters[mainKey] = {};
-            }
-            
-            const targetGroup = classifiedCounters[mainKey];
+            if (!classifiedCounters[mainKey]) classifiedCounters[mainKey] = {};
             const subItems = weekData[mainKey].subItems || {};
-            
             for (let subKey in subItems) {
                 const subItem = subItems[subKey];
                 if (subItem.completed > 0) {
-                    if (!targetGroup[subKey]) targetGroup[subKey] = 0;
-                    targetGroup[subKey] += subItem.completed;
+                    if (!classifiedCounters[mainKey][subKey]) classifiedCounters[mainKey][subKey] = 0;
+                    classifiedCounters[mainKey][subKey] += subItem.completed;
                 }
             }
         }
     }
 
-    const tempTaskList = (typeof globalAppData !== 'undefined' && globalAppData.tempTasks) ? globalAppData.tempTasks : [];
-    tempTaskList.forEach(task => {
-        if (task.completed > 0) {
-            if (!classifiedCounters["臨時任務"]) {
-                classifiedCounters["臨時任務"] = {};
-            }
-            if (!classifiedCounters["臨時任務"][task.name]) {
-                classifiedCounters["臨時任務"][task.name] = 0;
-            }
-            classifiedCounters["臨時任務"][task.name] += task.completed;
-        }
-    });
-
     let hasAnyData = false;
-
     for (let groupName in classifiedCounters) {
         const items = classifiedCounters[groupName];
         const itemKeys = Object.keys(items);
-        
         if (itemKeys.length > 0) {
             hasAnyData = true;
             const groupCard = document.createElement('div');
             groupCard.className = 'category-group-card';
-            
-            // 安全防禦調用：絕不因為 template[groupName] 為空而拋錯斷掉
-            const borderStyleColor = getSafeMacaronColor(groupName, '#bae1ff');
-            
-            groupCard.style.borderTop = `4px solid ${borderStyleColor}`;
+            groupCard.style.borderTop = `4px solid ${getSafeMacaronColor(groupName, '#bae1ff')}`;
 
             let html = `<div class="category-group-title">${groupName}</div>`;
             itemKeys.forEach(itemName => {
-                html += `
-                    <div class="stat-item-row">
-                        <span class="name">${itemName}</span>
-                        <span class="count">${items[itemName]} 次</span>
-                    </div>
-                `;
+                html += `<div class="stat-item-row"><span class="name">${itemName}</span><span class="count">${items[itemName]} 次</span></div>`;
             });
-            
             groupCard.innerHTML = html;
             container.appendChild(groupCard);
         }
     }
-
-    if (!hasAnyData) {
-        container.innerHTML = `<div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>`;
-    }
+    if (!hasAnyData) container.innerHTML = `<div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>`;
 }
 
 window.onload = () => {
-    // 監聽登入狀態並由 Firebase 自動同步下載數據
     auth.onAuthStateChanged((user) => {
         if (user) {
             userDbRef = db.ref('users/' + user.uid);
             userDbRef.once('value').then((snapshot) => {
                 const data = snapshot.val();
-                if (data) {
-                    globalAppData = data;
-                }
-                
-                // 雲端資料到齊後，開始安全渲染年曆
+                if (data) globalAppData = data;
                 initCalendarGrid();
             });
         } else {
@@ -330,7 +327,6 @@ window.onload = () => {
     });
 };
 
-// 封裝原本年曆載入後的初始化執行流程
 function initCalendarGrid() {
     const systemDate = new Date();
     let todayStr = "2026-07-11"; 
@@ -345,15 +341,8 @@ function initCalendarGrid() {
     }
 
     selectedDateStr = todayStr;
-
     renderMonthsCalendar(todayStr);
     renderWeeksCalendar();
-    
-    try {
-        calculateAnnualSummaryStats();
-    } catch (e) {
-        console.error("年度統計計算中斷防禦觸發:", e);
-    }
-
+    try { calculateAnnualSummaryStats(); } catch (e) {}
     showDateDetails(todayStr, systemWeekKey);
 }

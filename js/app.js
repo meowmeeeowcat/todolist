@@ -1,5 +1,84 @@
 // js/app.js
+// ================= Firebase 雲端同步核心 =================
+const firebaseConfig = {
+    apiKey: "AIzaSyA4gMYuA7BjykCeXQP7N5AOkUSJPzw8qI8",
+    authDomain: "todolist-f37a5.firebaseapp.com",
+    databaseURL: "https://todolist-f37a5-default-rtdb.firebaseio.com",
+    projectId: "todolist-f37a5",
+    storageBucket: "todolist-f37a5.firebasestorage.app",
+    messagingSenderId: "784814496491",
+    appId: "1:784814496491:web:330a8ccf2c312e224fbcae"
+};
 
+// 安全初始化
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const auth = firebase.auth();
+const db = firebase.database();
+let userDbRef = null;
+
+// 當瀏覽器載入或辨識到手機使用者時，自動觸發此區塊
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        userDbRef = db.ref('users/' + user.uid);
+        
+        // 【自動讀取本地週次與建立選單】
+        const weekSelectEl = document.getElementById('week-select');
+        if (weekSelectEl) {
+            weekSelectEl.innerHTML = '';
+            for(let w = 1; w <= 53; w++) {
+                const opt = document.createElement('option');
+                opt.value = `第 ${w} 週`; opt.innerText = `第 ${w} 週`;
+                weekSelectEl.appendChild(opt);
+            }
+            
+            const systemDate = new Date();
+            let computedWeekStr = "第 1 週";
+            if (systemDate.getFullYear() === 2026) {
+                const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(systemDate.getDate()).padStart(2, '0');
+                const todayStr = `2026-${mm}-${dd}`;
+                const wNum = getWeekNumberByDate(todayStr);
+                if (wNum) computedWeekStr = wNum;
+            }
+            currentWeek = computedWeekStr;
+            weekSelectEl.value = computedWeekStr;
+        }
+
+        // 去雲端把資料抓下來
+        loadDataFromStorage();
+    } else {
+        auth.signInAnonymously().catch((error) => {
+            console.error("匿名登入失敗:", error);
+        });
+    }
+});
+
+// 重寫儲存與讀取函數，讓它們改走雲端資料庫
+function saveDataToStorage() {
+    if (!userDbRef) return;
+    userDbRef.set(globalAppData)
+        .then(() => console.log("資料同步成功"))
+        .catch(err => console.error("同步失敗:", err));
+}
+
+function loadDataFromStorage() {
+    if (!userDbRef) return;
+    userDbRef.once('value').then((snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            globalAppData = data;
+            if (!globalAppData.template) globalAppData.template = {};
+            if (!globalAppData.tempTasks) globalAppData.tempTasks = [];
+        } else {
+            globalAppData = { template: {}, tempTasks: [] };
+            saveDataToStorage();
+        }
+        updateView(); // 確定抓到雲端資料後才渲染畫面
+    });
+}
+// =======================================================
 const titleEl = document.getElementById('chart-title');
 const backBtn = document.getElementById('back-btn');
 const listContainer = document.getElementById('todo-list');
@@ -554,36 +633,3 @@ weekSelect.addEventListener('change', (e) => {
     currentWeek = e.target.value; currentView = 'main'; currentSubKey = null; resetChartInstance(); updateView();
 });
 
-window.onload = () => {
-    // 1. 建立 1 到 53 週的下拉選單選項
-    weekSelect.innerHTML = '';
-    for(let w = 1; w <= 53; w++) {
-        const opt = document.createElement('option');
-        opt.value = `第 ${w} 週`; opt.innerText = `第 ${w} 週`;
-        weekSelect.appendChild(opt);
-    }
-
-    // 2. 讀取本地實際系統日期並計算當前週次
-    const systemDate = new Date();
-    let computedWeekStr = "第 1 週"; // 預設安全值
-
-    // 判定是否為 2026 年度（若是則精確計算，若非則預設第 1 週防止溢出）
-    if (systemDate.getFullYear() === 2026) {
-        // 複用 app.js 內部的 getWeekNumberByDate 函數計算當前週次
-        const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(systemDate.getDate()).padStart(2, '0');
-        const todayStr = `2026-${mm}-${dd}`;
-        
-        const wNum = getWeekNumberByDate(todayStr);
-        if (wNum) {
-            computedWeekStr = wNum;
-        }
-    }
-
-    // 3. 將全域變數 currentWeek 設為計算出來的週次
-    currentWeek = computedWeekStr;
-
-    // 4. 同步讓下拉選單（Select）顯示正確的選取項
-    weekSelect.value = computedWeekStr;
-
-};
