@@ -1,0 +1,316 @@
+/* css/style.css */
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #f0f4f8;
+    color: #2c3e50;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    font-size: 16px;
+}
+
+.container {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(54, 162, 235, 0.08);
+    width: 900px;
+}
+
+/* 控制面板佈局：下拉選單與年曆按鈕靠左緊鄰 */
+.control-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.control-panel > div {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* 在第一週下拉選單與年曆按鈕之間增加 12px 的空隙 */
+}
+
+select, input[type="text"], input[type="number"], input[type="date"] {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+    font-size: 16px;
+    outline: none;
+    color: #2c3e50;
+}
+
+select:focus, input:focus {
+    border-color: #4bc0c0;
+    box-shadow: 0 0 0 2px rgba(75, 192, 192, 0.2);
+}
+
+.main-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 30px;
+}
+
+.left-column {
+    display: flex;
+    flex-direction: column;
+    width: 400px;
+}
+
+#chart-title {
+    margin-top: 0;
+    font-size: 26px;
+    color: #1a4d6c;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+.chart-wrapper {
+    position: relative;
+    width: 380px;
+    height: 380px;
+}
+
+.todo-list-wrapper {
+    flex-grow: 1;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.list-header h3 {
+    margin: 0;
+    color: #1a4d6c;
+    font-size: 20px;
+}
+
+#todo-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    max-height: 340px;
+    flex-grow: 1;
+}
+
+.todo-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 16px;
+    height: 24px;
+}
+
+.todo-item:hover {
+    background: #e6f7f7;
+    transform: translateY(-1px);
+}
+
+.todo-item-clickable-area {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+}
+
+.todo-item-progress-tag {
+    background-color: #e2e8f0;
+    color: #475569;
+    padding: 3px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.counter-btn {
+    background: #e2e8f0;
+    border: none;
+    padding: 4px 10px;
+    margin: 0 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.counter-btn:hover {
+    background: #cbd5e1;
+}
+
+/* ================= 按鈕顯示切換邏輯 ================= */
+
+.todo-list-wrapper.editing-mode .todo-item-progress-tag {
+    display: none !important;
+}
+
+.actions {
+    display: none !important;
+    align-items: center;
+    gap: 8px;
+}
+.todo-list-wrapper.editing-mode .actions {
+    display: flex !important;
+}
+
+.sub-counter {
+    display: flex;
+    align-items: center;
+}
+.todo-list-wrapper.editing-mode .sub-counter {
+    display: none !important;
+}
+
+/* ================= 彈出視窗 (Modal) 樣式 ================= */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    width: 450px;
+    position: relative;
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 10px;
+}
+
+.modal-header h4 {
+    margin: 0;
+    color: #1a4d6c;
+    font-size: 18px;
+}
+
+.close-modal-btn {
+    background: none;
+    color: #aaa;
+    border: none;
+    padding: 0;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+}
+.close-modal-btn:hover {
+    color: #666;
+    background: none;
+}
+
+.add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.form-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 15px;
+}
+
+.form-row input[type="text"], .form-row select {
+    flex-grow: 1;
+}
+
+.form-row input[type="number"] {
+    width: 75px;
+}
+
+button {
+    padding: 10px 18px;
+    background-color: #4bc0c0;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 15px;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #36a2eb;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.edit-btn {
+    background-color: #ff9f43;
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+}
+.edit-btn:hover {
+    background-color: #ee8a2e;
+}
+
+.delete-btn {
+    background-color: #ee5253;
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+}
+.delete-btn:hover {
+    background-color: #d63031;
+}
+.archive-btn {
+    background-color: #10b981; /* 綠色代表完成結案 */
+    color: white;
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+}
+.archive-btn:hover {
+    background-color: #059669;
+}

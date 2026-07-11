@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 年度數據智慧年曆看板</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/calendar.css">
+</head>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<body>
+
+    <div class="container calendar-main-container">
+        <div class="control-panel">
+            <h2>2026 年度數據智慧年曆看板</h2>
+            <button id="nav-back-btn" onclick="window.location.href='index.html'">返回主圖表頁</button>
+        </div>
+
+        <div class="calendar-top-dashboard">
+            <div class="control-actions-box">
+                <button id="tab-months" class="tab-btn active" onclick="switchView('months')">12個月傳統年曆</button>
+                <button id="tab-weeks" class="tab-btn" onclick="switchView('weeks')">53週週達成率視圖</button>
+            </div>
+            
+            <div class="summary-stats-section">
+                <h3>全年度任務執行總次數累計看板（分類別統整）</h3>
+                <div id="annual-stats-classified-container" class="stats-classified-flex">
+                    <div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="calendar-dashboard">
+            <div class="calendar-left">
+                <div id="months-view-container" class="months-grid"></div>
+                <div id="weeks-view-container" class="weeks-53-grid hidden"></div>
+            </div>
+
+            <div class="calendar-right">
+                <h3 id="focus-date-title">讀取中...</h3>
+                <div id="focus-date-week-hint"></div>
+                <div id="focus-date-details">選擇年曆上的日期查看當天進度。</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/calendar.js"></script>
+</body>
+</html>
