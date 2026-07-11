@@ -6,7 +6,7 @@ const categoryHues = {
     "家務": 40
 };
 
-// 預設範本
+// 預設安全範本
 let defaultTemplate = {
     "運動": {
         customHue: 180,
@@ -38,158 +38,134 @@ let globalAppData = {
     tempTasks: []
 };
 
-// 資料庫存取核心邏輯
+// 本地暫存相容層（留空以防主程式呼叫報錯，核心已由 app.js/calendar.js 的 Firebase 接管）
 function loadDataFromStorage() {
-    const localData = localStorage.getItem('weekly_todo_app_data');
-    if (localData) {
-        globalAppData = JSON.parse(localData);
-    } else {
-        for (let w = 1; w <= 53; w++) {
-            globalAppData.progress[`第 ${w} 週`] = {};
-        }
-        saveDataToStorage();
-    }
+    console.log("Data core synced with cloud infrastructure.");
 }
-
 function saveDataToStorage() {
-    localStorage.setItem('weekly_todo_app_data', JSON.stringify(globalAppData));
+    console.log("Data core requested save via cloud infrastructure.");
 }
 
-function getWeekNumberByDate(dateString) {
-    const targetDate = new Date(dateString);
-    if (isNaN(targetDate.getTime())) return null;
+let weeklyDataStore = {};
+
+// 核心計算整合函數
+function calculateMainItems(weekKey) {
+    weeklyDataStore[weekKey] = {};
     
-    const startOfYear = new Date(targetDate.getFullYear(), 0, 1);
-    const pastDaysOfYear = (targetDate - startOfYear) / 86400000;
-    const weekNum = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+    // 【關鍵防禦】：若資料庫尚未載入完成或結構不存在，安全回傳空箱子
+    if (!globalAppData) return;
+    const template = globalAppData.template || {};
     
-    return weekNum >= 1 && weekNum <= 53 ? `第 ${weekNum} 週` : null;
+    // 呼叫資料組裝
+    assembleWeeklyData(weekKey, template);
+    assembleTemporaryData(weekKey);
 }
 
-function parseWeekNum(weekKey) {
-    return parseInt(weekKey.replace(/[^0-9]/g, ""), 10) || 0;
-}
+// 組裝常規任務進度
+function assembleWeeklyData(weekKey, template) {
+    // 【關鍵防禦】：防範 progress 尚未從 Firebase 載入完成的崩潰點
+    const progress = globalAppData.progress || {};
+    const weekProgress = progress[weekKey] || {}; 
 
-let weeklyDataStore = {}; 
-
-// 週資料結構組裝
-function assembleWeeklyData(weekKey) {
-    const template = globalAppData.template;
-    const progress = globalAppData.progress[weekKey] || {};
-    const currentWeekIdx = parseWeekNum(weekKey);
-    
-    let currentWeekStructure = {};
-    
     for (let mainKey in template) {
-        let hasActiveSubItem = false;
-        let subStructure = {};
-        
-        for (let subKey in template[mainKey].subItems) {
-            const itemConfig = template[mainKey].subItems[subKey];
-            
-            if (itemConfig.archived && currentWeekIdx >= parseWeekNum(itemConfig.archivedFromWeek)) {
-                continue; 
-            }
-            
-            hasActiveSubItem = true;
-            const targetTotal = itemConfig.total;
-            const targetComp = progress[subKey] !== undefined ? progress[subKey] : 0;
-            
-            subStructure[subKey] = {
-                total: targetTotal,
-                completed: targetComp > targetTotal ? targetTotal : targetComp,
-                customHue: itemConfig.customHue
-            };
+        const mainItem = template[mainKey];
+        if (mainItem.archived && compareWeeks(weekKey, mainItem.archivedFromWeek) >= 0) {
+            continue;
         }
-        
-        const mainConfig = template[mainKey];
-        const isMainArchived = mainConfig.archived && currentWeekIdx >= parseWeekNum(mainConfig.archivedFromWeek);
-        
-        if (!isMainArchived && (hasActiveSubItem || Object.keys(template[mainKey].subItems).length === 0)) {
-            currentWeekStructure[mainKey] = {
-                customHue: template[mainKey].customHue,
-                subItems: subStructure
-            };
-        }
-    }
-    
-    globalAppData.tempTasks.forEach(task => {
-        const taskWeek = getWeekNumberByDate(task.date);
-        if (taskWeek === weekKey) {
-            if (task.archived) return;
 
-            if (!currentWeekStructure[task.category]) {
-                currentWeekStructure[task.category] = { 
-                    customHue: task.customHue !== undefined ? task.customHue : 0, 
-                    subItems: {} 
+        let mainTotal = 0;
+        let mainCompleted = 0;
+        
+        let hueValue = mainItem.customHue !== undefined ? mainItem.customHue : (categoryHues[mainKey] || 0);
+        let matchedPalette = (window.fixedPalette && window.fixedPalette.find(p => p.hue === hueValue)) || { color: `hsl(${hueValue}, 100%, 85%)` };
+
+        weeklyDataStore[weekKey][mainKey] = {
+            total: 0,
+            completed: 0,
+            color: matchedPalette.color,
+            subItems: {}
+        };
+
+        const subItems = mainItem.subItems || {};
+        for (let subKey in subItems) {
+            const subItem = subItems[subKey];
+            if (subItem.archived && compareWeeks(weekKey, subItem.archivedFromWeek) >= 0) {
+                continue;
+            }
+
+            const total = subItem.total || 1;
+            const completed = weekProgress[subKey] || 0;
+
+            mainTotal += total;
+            mainCompleted += completed;
+
+            let subHue = subItem.customHue !== undefined ? subItem.customHue : hueValue;
+            let subMatchedPalette = (window.fixedPalette && window.fixedPalette.find(p => p.hue === subHue)) || matchedPalette;
+            
+            weeklyDataStore[weekKey][mainKey].subItems[subKey] = {
+                total: total,
+                completed: completed,
+                color: subMatchedPalette.color,
+                isTemp: false
+            };
+        }
+
+        weeklyDataStore[weekKey][mainKey].total = mainTotal;
+        weeklyDataStore[weekKey][mainKey].completed = mainCompleted;
+        weeklyDataStore[weekKey][mainKey].color = matchedPalette.color;
+    }
+}
+
+// 組裝臨時任務進度
+function assembleTemporaryData(weekKey) {
+    const tempTasks = globalAppData.tempTasks || [];
+    
+    tempTasks.forEach(task => {
+        if (task.archived) return;
+        
+        const computedWeekKey = getWeekNumberByDate(task.date);
+        if (computedWeekKey === weekKey) {
+            const cat = task.category || "臨時任務";
+            if (!weeklyDataStore[weekKey][cat]) {
+                weeklyDataStore[weekKey][cat] = {
+                    total: 0,
+                    completed: 0,
+                    color: task.color || '#94a3b8',
+                    subItems: {}
                 };
             }
-            const displayTaskName = `📌 [${task.date.slice(5)}] ${task.name}`;
-            currentWeekStructure[task.category].subItems[displayTaskName] = {
+            weeklyDataStore[weekKey][cat].total += (task.total || 0);
+            weeklyDataStore[weekKey][cat].completed += (task.completed || 0);
+            weeklyDataStore[weekKey][cat].subItems[task.name] = {
                 total: task.total,
                 completed: task.completed,
-                color: task.color,
-                customHue: task.customHue,
-                isTemp: true, 
-                tempId: task.id 
+                color: task.color || '#94a3b8',
+                isTemp: true,
+                tempId: task.id
             };
         }
     });
-    
-    weeklyDataStore[weekKey] = currentWeekStructure;
 }
 
-// 計算大類別並精確渲染馬卡龍色卡
-function calculateMainItems(weekKey) {
-    assembleWeeklyData(weekKey); 
-    const weekData = weeklyDataStore[weekKey];
-    if (!weekData) return;
+const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    // 💡 修正點：若全域環境已有 window.fixedPalette 則直接採用，免去重複宣告的崩潰風險
-    const currentPalette = window.fixedPalette || [
-        { name: "馬卡龍櫻桃紅", color: "#ffb3ba", hue: 355 },
-        { name: "馬卡龍活力橙", color: "#ffdfba", hue: 32 },
-        { name: "馬卡龍香蕉黃", color: "#ffffba", hue: 60 },
-        { name: "馬卡龍薄荷綠", color: "#baffc9", hue: 133 },
-        { name: "馬卡龍湖水綠", color: "#aefff5", hue: 172 },
-        { name: "馬卡龍晴空藍", color: "#bae1ff", hue: 206 },
-        { name: "馬卡龍風信子靛", color: "#c5cbff", hue: 233 },
-        { name: "馬卡龍薰衣草紫", color: "#e8bfff", hue: 279 },
-        { name: "馬卡龍迷霧粉紫", color: "#fbcfff", hue: 296 },
-        { name: "馬卡龍玫瑰豆沙", color: "#ffc6ff", hue: 300 }
-    ];
-
-    for (let mainKey in weekData) {
-        let mainTotal = 0;
-        let mainCompleted = 0;
-        const subItemsObj = weekData[mainKey].subItems || {};
-        const subKeys = Object.keys(subItemsObj);
-        
-        const currentHue = weekData[mainKey].customHue;
-        const matchedPalette = currentPalette.find(p => p.hue === currentHue) || currentPalette[0];
-
-        if (subKeys.length === 0) {
-            weekData[mainKey].total = 1; 
-            weekData[mainKey].completed = 0;
-            weekData[mainKey].color = matchedPalette.color;
-            continue; 
-        }
-
-        subKeys.forEach((subKey) => {
-            const subItem = subItemsObj[subKey];
-            mainTotal += subItem.total;
-            mainCompleted += subItem.completed;
-            
-            const subHue = subItem.customHue !== undefined ? subItem.customHue : currentHue;
-            const subMatchedPalette = currentPalette.find(p => p.hue === subHue) || matchedPalette;
-            
-            subItem.color = subItem.color || subMatchedPalette.color;
-        });
-
-        weekData[mainKey].total = mainTotal;
-        weekData[mainKey].completed = mainCompleted;
-        weekData[mainKey].color = matchedPalette.color;
+function getWeekNumberByDate(dateStr) {
+    if(!dateStr) return null;
+    const d = new Date(dateStr);
+    if (d.getFullYear() !== 2026) return null;
+    let totalDays = d.getDate();
+    for (let i = 0; i < d.getMonth(); i++) {
+        totalDays += daysInMonths[i];
     }
+    const w = Math.ceil((totalDays + 3) / 7);
+    return (w >= 1 && w <= 53) ? `第 ${w} 週` : null;
+}
+
+function compareWeeks(w1, w2) {
+    if (!w1 || !w2) return 0;
+    const num1 = parseInt(w1.replace(/[^0-9]/g, ''), 10);
+    const num2 = parseInt(w2.replace(/[^0-9]/g, ''), 10);
+    return num1 - num2;
 }
 
 // 圖表數據封裝
@@ -223,15 +199,12 @@ function getChartData(dataObject, isSubView = false) {
 
 function getWeekCompletionRate(weekKey) {
     calculateMainItems(weekKey);
-    const weekData = weeklyDataStore[weekKey];
+    const weekData = weeklyDataStore[weekKey] || {};
     let total = 0;
     let completed = 0;
     for (let key in weekData) {
-        total += weekData[key].total;
-        completed += weekData[key].completed;
+        total += weekData[key].total || 0;
+        completed += weekData[key].completed || 0;
     }
     return total > 0 ? (completed / total) : 0;
 }
-
-// 執行初始化載入
-loadDataFromStorage();
