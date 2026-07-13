@@ -16,69 +16,15 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 const db = firebase.database();
 
-let globalAppData = { template: {}, tempTasks: [] };
-let weeklyDataStore = {};
 let userDbRef = null;
 // =======================================================
 
-const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const monthNames = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
 const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
 
 let currentActiveView = 'months'; 
 let selectedDateStr = "";
 
-function calculateMainItems(weekKey) {
-    weeklyDataStore[weekKey] = {};
-    const template = globalAppData.template || {};
-    
-    for (let mainKey in template) {
-        weeklyDataStore[weekKey][mainKey] = { total: 0, completed: 0, subItems: {} };
-        const subItems = template[mainKey].subItems || {};
-        for (let subKey in subItems) {
-            const total = subItems[subKey].total || 0;
-            weeklyDataStore[weekKey][mainKey].total += total;
-            weeklyDataStore[weekKey][mainKey].subItems[subKey] = { total: total, completed: 0, isTemp: false };
-        }
-    }
-
-    const tempTasks = globalAppData.tempTasks || [];
-    tempTasks.forEach(task => {
-        if (task.date) {
-            const d = new Date(task.date);
-            let totalDays = d.getDate();
-            for (let i = 0; i < d.getMonth(); i++) totalDays += daysInMonths[i];
-            const w = Math.ceil((totalDays + 3) / 7);
-            const computedWeekKey = `第 ${w} 週`;
-
-            if (computedWeekKey === weekKey) {
-                const cat = task.category || "臨時任務";
-                if (!weeklyDataStore[weekKey][cat]) {
-                    weeklyDataStore[weekKey][cat] = { total: 0, completed: 0, subItems: {} };
-                }
-                weeklyDataStore[weekKey][cat].total += (task.total || 0);
-                weeklyDataStore[weekKey][cat].completed += (task.completed || 0);
-                weeklyDataStore[weekKey][cat].subItems[task.name] = {
-                    total: task.total,
-                    completed: task.completed,
-                    isTemp: true
-                };
-            }
-        }
-    });
-}
-
-function getWeekCompletionRate(weekKey) {
-    calculateMainItems(weekKey);
-    const weekData = weeklyDataStore[weekKey] || {};
-    let total = 0;
-    let completed = 0;
-    for (let key in weekData) {
-        total += weekData[key].total || 0;
-        completed += weekData[key].completed || 0;
-    }
-    return total > 0 ? (completed / total) : 0;
-}
 
 function getWeekNumberFor2026(monthIndex, day) {
     let totalDays = day;

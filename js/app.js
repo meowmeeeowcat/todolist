@@ -385,8 +385,9 @@ function renderTodoList() {
                         const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
                         if (task) task.completed++;
                     } else {
-                        if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
-                        globalAppData.progress[currentWeek][originalKey]++;
+                        if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
+if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
+globalAppData.progress[currentWeek][originalKey]++;
                     }
                     saveDataToStorage();
                     updateView();
@@ -400,6 +401,7 @@ function renderTodoList() {
                         const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
                         if (task) task.completed--;
                     } else {
+                        if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
                         if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
                         globalAppData.progress[currentWeek][originalKey]--;
                     }
