@@ -52,3 +52,38 @@ function resetChartInstance() {
         currentChartInstance = null;
     }
 }
+
+function getChartData(dataObj, isSub) {
+    const labels = [];
+    const dataValues = [];
+    const backgroundColors = [];
+    let totalRemaining = 0;
+
+    for (let key in dataObj) {
+        const item = dataObj[key];
+        const completed = item.completed || 0;
+        const total = item.total || 0;
+
+        labels.push(key);
+        dataValues.push(completed);
+        backgroundColors.push(item.color || '#bae1ff');
+
+        totalRemaining += Math.max(total - completed, 0);
+    }
+
+    // 加一片「未完成任務」代表這週還沒打卡的部分
+    if (totalRemaining > 0) {
+        labels.push('未完成任務');
+        dataValues.push(totalRemaining);
+        backgroundColors.push('#e2e8f0');
+    }
+
+    // 如果整週完全沒資料，給一個佔位的灰色圓餅，避免圖表空白報錯
+    if (dataValues.length === 0 || dataValues.every(v => v === 0)) {
+        labels.push('尚無資料');
+        dataValues.push(1);
+        backgroundColors.push('#f1f5f9');
+    }
+
+    return { labels, dataValues, backgroundColors };
+}
