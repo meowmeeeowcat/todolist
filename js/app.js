@@ -71,11 +71,13 @@ function loadDataFromStorage() {
             globalAppData = data;
             if (!globalAppData.template) globalAppData.template = {};
             if (!globalAppData.tempTasks) globalAppData.tempTasks = [];
+            if (!globalAppData.progress) globalAppData.progress = {};   // ← 新增這行
         } else {
             globalAppData = { template: {}, tempTasks: [] };
+            globalAppData.progress = {};   // ← 新增這行
             saveDataToStorage();
         }
-        updateView(); // 確定抓到雲端資料後才渲染畫面
+        updateView();
     });
 }
 // =======================================================
