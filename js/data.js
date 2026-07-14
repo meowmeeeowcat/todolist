@@ -116,7 +116,6 @@ function assembleTemporaryData(weekKey) {
     });
 }
 
-<<<<<<< HEAD
 // ================= tempTasks 儲存格式轉換 =================
 // 本機執行時 globalAppData.tempTasks 仍然是陣列（方便原本 .find/.filter/.forEach 的寫法）。
 // 但寫回 Firebase 時改成「用 task.id 當 key 的物件」，這樣才能針對單一臨時任務
@@ -147,31 +146,6 @@ function precomputeAllWeeks() {
 // 注意：這個函式現在「不會」主動重新計算，只讀 weeklyDataStore 目前的快取內容。
 // 呼叫前請確保該週已經算過（例如先呼叫過 precomputeAllWeeks() 或 calculateMainItems(weekKey)）。
 function getWeekCompletionRate(weekKey) {
-=======
-const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-function getWeekNumberByDate(dateStr) {
-    if(!dateStr) return null;
-    const d = new Date(dateStr);
-    if (d.getFullYear() !== 2026) return null;
-    let totalDays = d.getDate();
-    for (let i = 0; i < d.getMonth(); i++) {
-        totalDays += daysInMonths[i];
-    }
-    const w = Math.ceil((totalDays + 3) / 7);
-    return (w >= 1 && w <= 53) ? `第 ${w} 週` : null;
-}
-
-function compareWeeks(w1, w2) {
-    if (!w1 || !w2) return 0;
-    const num1 = parseInt(w1.replace(/[^0-9]/g, ''), 10);
-    const num2 = parseInt(w2.replace(/[^0-9]/g, ''), 10);
-    return num1 - num2;
-}
-
-function getWeekCompletionRate(weekKey) {
-    calculateMainItems(weekKey);
->>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     const weekData = window.weeklyDataStore[weekKey] || {};
     let total = 0;
     let completed = 0;
