@@ -1,4 +1,51 @@
 // js/app.js
+<<<<<<< HEAD
+// ================= Firebase 雲端同步 =================
+// firebaseConfig / auth / db 的初始化已搬到共用檔案 js/firebase-init.js，
+// 這裡只呼叫 initFirebaseAuth() 並傳入「登入完成後要做的事」。
+initFirebaseAuth(() => {
+    // 【自動讀取本地週次與建立選單】
+    const weekSelectEl = document.getElementById('week-select');
+    if (weekSelectEl) {
+        weekSelectEl.innerHTML = '';
+        for (let w = 1; w <= 53; w++) {
+            const opt = document.createElement('option');
+            opt.value = `第 ${w} 週`; opt.innerText = `第 ${w} 週`;
+            weekSelectEl.appendChild(opt);
+        }
+
+        const systemDate = new Date();
+        let computedWeekStr = "第 1 週";
+        if (systemDate.getFullYear() === 2026) {
+            const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(systemDate.getDate()).padStart(2, '0');
+            const todayStr = `2026-${mm}-${dd}`;
+            const wNum = getWeekNumberByDate(todayStr);
+            if (wNum) computedWeekStr = wNum;
+        }
+        currentWeek = computedWeekStr;
+        weekSelectEl.value = computedWeekStr;
+    }
+
+    // 去雲端把資料抓下來
+    loadDataFromStorage();
+});
+
+// ================= 儲存 / 讀取 =================
+// 原本每次改一點點資料，就 userDbRef.set(globalAppData) 把「全部」資料整包蓋掉雲端，
+// 缺點：(1) 資料量越大越慢 (2) 兩個分頁/裝置幾乎同時操作時，後寫入的會直接覆蓋先寫入的，容易資料遺失。
+// 現在拆成「只寫真正變動的那一小塊」，並且對「打卡計數」這種高頻率動作改用 transaction，
+// 讓 Firebase 在伺服器端做「讀取目前值 → 累加 → 寫回」，就算兩處同時點擊也不會互相蓋掉。
+
+// 只有全新使用者第一次建立資料時，才需要整包寫入一次
+function saveDataToStorage() {
+    if (!userDbRef) return;
+    userDbRef.set({
+        template: globalAppData.template,
+        progress: globalAppData.progress,
+        tempTasks: tempTasksArrayToObject(globalAppData.tempTasks)
+    })
+=======
 // ================= Firebase 雲端同步核心 =================
 const firebaseConfig = {
     apiKey: "AIzaSyA4gMYuA7BjykCeXQP7N5AOkUSJPzw8qI8",
@@ -59,10 +106,54 @@ auth.onAuthStateChanged((user) => {
 function saveDataToStorage() {
     if (!userDbRef) return;
     userDbRef.set(globalAppData)
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
         .then(() => console.log("資料同步成功"))
         .catch(err => console.error("同步失敗:", err));
 }
 
+<<<<<<< HEAD
+// 常規任務範本有變動時（新增/改名/改色/封存/刪除大類別或子項）才呼叫
+function saveTemplate() {
+    if (!userDbRef) return;
+    userDbRef.child('template').set(globalAppData.template)
+        .then(() => console.log("範本同步成功"))
+        .catch(err => console.error("範本同步失敗:", err));
+}
+
+// progress 整棵樹有結構性變動時（例如刪除某任務、跨週搬移紀錄）才呼叫
+function saveProgressTree() {
+    if (!userDbRef) return;
+    userDbRef.child('progress').set(globalAppData.progress)
+        .then(() => console.log("進度同步成功"))
+        .catch(err => console.error("進度同步失敗:", err));
+}
+
+// 臨時任務清單有結構性變動時（新增/改名/改色/封存/刪除）才呼叫，寫入時轉成用 id 當 key 的物件
+function saveTempTasksTree() {
+    if (!userDbRef) return;
+    userDbRef.child('tempTasks').set(tempTasksArrayToObject(globalAppData.tempTasks))
+        .then(() => console.log("臨時任務同步成功"))
+        .catch(err => console.error("臨時任務同步失敗:", err));
+}
+
+// 常規任務「打卡 +1 / -1」：只動 progress/{週}/{任務名} 這一個節點，並用 transaction 防止競態覆寫
+function syncRegularCounter(weekKey, taskName, delta) {
+    if (!userDbRef) return;
+    userDbRef.child(`progress/${weekKey}/${taskName}`).transaction((current) => {
+        return Math.max((current || 0) + delta, 0);
+    }).catch(err => console.error("計數同步失敗:", err));
+}
+
+// 臨時任務「打卡 +1 / -1」：只動 tempTasks/{id}/completed 這一個節點，同樣用 transaction
+function syncTempTaskCounter(taskId, delta) {
+    if (!userDbRef) return;
+    userDbRef.child(`tempTasks/${taskId}/completed`).transaction((current) => {
+        return Math.max((current || 0) + delta, 0);
+    }).catch(err => console.error("臨時任務計數同步失敗:", err));
+}
+
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
 function loadDataFromStorage() {
     if (!userDbRef) return;
     userDbRef.once('value').then((snapshot) => {
@@ -70,6 +161,16 @@ function loadDataFromStorage() {
         if (data) {
             globalAppData = data;
             if (!globalAppData.template) globalAppData.template = {};
+<<<<<<< HEAD
+            if (!globalAppData.progress) globalAppData.progress = {};
+            // tempTasks 在雲端可能是舊格式（陣列）或新格式（用 id 當 key 的物件），統一轉回本機用的陣列
+            globalAppData.tempTasks = tempTasksObjectToArray(globalAppData.tempTasks);
+        } else {
+            globalAppData = { template: {}, tempTasks: [], progress: {} };
+            saveDataToStorage(); // 全新使用者，第一次整包寫入是合理的
+        }
+        window.globalAppData = globalAppData;
+=======
             if (!globalAppData.tempTasks) globalAppData.tempTasks = [];
             if (!globalAppData.progress) globalAppData.progress = {};   // ← 新增這行
         } else {
@@ -77,6 +178,7 @@ function loadDataFromStorage() {
             globalAppData.progress = {};   // ← 新增這行
             saveDataToStorage();
         }
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
         updateView();
     });
 }
@@ -284,7 +386,11 @@ function renderTodoList() {
                     globalAppData.template[key].archived = true;
                     globalAppData.template[key].archivedFromWeek = currentWeek;
                 }
+<<<<<<< HEAD
+                saveTemplate();
+=======
                 saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                 updateView();
             });
 
@@ -329,7 +435,12 @@ function renderTodoList() {
                 
                 globalAppData.tempTasks = globalAppData.tempTasks.filter(t => !(t.category === key && getWeekNumberByDate(t.date) === currentWeek));
 
+<<<<<<< HEAD
+                saveTemplate();
+                saveTempTasksTree();
+=======
                 saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                 resetChartInstance();
                 updateView();
             });
@@ -367,14 +478,23 @@ function renderTodoList() {
                     if (!confirm("確定將此臨時任務標記為完結並在列表上隱藏嗎？")) return;
                     const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
                     if (task) task.archived = true;
+<<<<<<< HEAD
+                    saveTempTasksTree();
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                 } else {
                     if (!confirm(`確定將常規子任務「${originalKey}」完結嗎？\n此項目將從【${currentWeek}】起往後的週次消失，但歷史完成數據均會安全保留。`)) return;
                     if (globalAppData.template[currentSubKey] && globalAppData.template[currentSubKey].subItems[originalKey]) {
                         globalAppData.template[currentSubKey].subItems[originalKey].archived = true;
                         globalAppData.template[currentSubKey].subItems[originalKey].archivedFromWeek = currentWeek;
                     }
+<<<<<<< HEAD
+                    saveTemplate();
+                }
+=======
                 }
                 saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                 updateView();
             });
 
@@ -384,12 +504,22 @@ function renderTodoList() {
                     if (subItem.isTemp) {
                         const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
                         if (task) task.completed++;
+<<<<<<< HEAD
+                        syncTempTaskCounter(subItem.tempId, 1);
+                    } else {
+                        if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
+                        if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
+                        globalAppData.progress[currentWeek][originalKey]++;
+                        syncRegularCounter(currentWeek, originalKey, 1);
+                    }
+=======
                     } else {
                         if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
 if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
 globalAppData.progress[currentWeek][originalKey]++;
                     }
                     saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                     updateView();
                 }
             });
@@ -400,12 +530,21 @@ globalAppData.progress[currentWeek][originalKey]++;
                     if (subItem.isTemp) {
                         const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
                         if (task) task.completed--;
+<<<<<<< HEAD
+                        syncTempTaskCounter(subItem.tempId, -1);
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                     } else {
                         if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
                         if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
                         globalAppData.progress[currentWeek][originalKey]--;
+<<<<<<< HEAD
+                        syncRegularCounter(currentWeek, originalKey, -1);
+                    }
+=======
                     }
                     saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                     updateView();
                 }
             });
@@ -445,13 +584,23 @@ globalAppData.progress[currentWeek][originalKey]++;
                 if (subItem.isTemp) {
                     if (confirm(`確定要刪除此臨時任務嗎？`)) {
                         globalAppData.tempTasks = deleteTempTaskFilter(subItem.tempId);
+<<<<<<< HEAD
+                        saveTempTasksTree();
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                     }
                 } else {
                     if (!confirm("【全週同步刪除】這會將全年度所有週次的此任務刪除！確定嗎？")) return;
                     delete globalAppData.template[currentSubKey].subItems[originalKey];
                     for (let w in globalAppData.progress) { delete globalAppData.progress[w][originalKey]; }
+<<<<<<< HEAD
+                    saveTemplate();
+                    saveProgressTree();
+                }
+=======
                 }
                 saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
                 updateView();
             });
 
@@ -533,6 +682,12 @@ addTaskBtn.addEventListener('click', () => {
                     }
                 }
             });
+<<<<<<< HEAD
+
+            saveTemplate();
+            saveTempTasksTree();
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
         } 
         else if (editingContext.type === 'sub-item') {
             const originalKey = editingContext.originalKey;
@@ -551,6 +706,10 @@ addTaskBtn.addEventListener('click', () => {
                         task.customHue = chosenHue;
                     }
                 }
+<<<<<<< HEAD
+                saveTempTasksTree();
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
             } else {
                 const template = globalAppData.template[currentSubKey].subItems;
                 if (newName !== originalKey) {
@@ -569,10 +728,18 @@ addTaskBtn.addEventListener('click', () => {
                     // 修正：明確指向選中物件的 hue，避免變數因閉包或非同步產生對齊落差
                     template[newName].customHue = selectedPaletteItem.hue;
                }
+<<<<<<< HEAD
+                saveTemplate();
+                saveProgressTree();
+            }
+        }
+        
+=======
             }
         }
         
         saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
         closeModal();
         updateView();
         return;
@@ -617,12 +784,22 @@ addTaskBtn.addEventListener('click', () => {
             color: chosenColor,
             customHue: chosenHue
         });
+<<<<<<< HEAD
+        saveTempTasksTree();
+        alert(`新增成功！臨時任務已排入：${computedWeek}`);
+    } else {
+        globalAppData.template[targetCategory].subItems[taskName] = { total: taskTotal, customHue: chosenHue };
+        saveTemplate();
+    }
+
+=======
         alert(`新增成功！臨時任務已排入：${computedWeek}`);
     } else {
         globalAppData.template[targetCategory].subItems[taskName] = { total: taskTotal, customHue: chosenHue };
     }
 
     saveDataToStorage();
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     closeModal();
     updateView();
 });

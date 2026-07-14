@@ -1,4 +1,7 @@
 // js/calendar.js
+<<<<<<< HEAD
+// firebaseConfig / auth / db 的初始化已搬到共用檔案 js/firebase-init.js
+=======
 // ================= Firebase 初始化配置 =================
 const firebaseConfig = {
     apiKey: "AIzaSyA4gMYuA7BjykCeXQP7N5AOkUSJPzw8qI8",
@@ -18,6 +21,7 @@ const db = firebase.database();
 
 let userDbRef = null;
 // =======================================================
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
 
 const monthNames = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
 const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
@@ -26,6 +30,9 @@ let currentActiveView = 'months';
 let selectedDateStr = "";
 
 
+<<<<<<< HEAD
+// getWeekNumberFor2026 / formatDateString 已搬到共用檔案 js/date-utils.js（html 需先載入它）
+=======
 function getWeekNumberFor2026(monthIndex, day) {
     let totalDays = day;
     for (let i = 0; i < monthIndex; i++) {
@@ -39,6 +46,7 @@ function formatDateString(mIdx, d) {
     const dd = String(d).padStart(2, '0');
     return `2026-${mm}-${dd}`;
 }
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
 
 function switchView(viewType) {
     currentActiveView = viewType;
@@ -147,7 +155,11 @@ function showDateDetails(dateStr, weekKey) {
     if (titleEl) titleEl.innerText = `檢視日期：${dateStr}`;
     if (hintEl) hintEl.innerText = `所屬週次：${weekKey}`;
     
+<<<<<<< HEAD
+    // 該週資料已由 precomputeAllWeeks() 預先算好並存在 weeklyDataStore 快取中，這裡直接讀取即可
+=======
     calculateMainItems(weekKey);
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     const weekData = weeklyDataStore[weekKey] || {};
     let html = "";
 
@@ -195,7 +207,11 @@ function showWeekWholeDetails(weekKey) {
     if (titleEl) titleEl.innerText = `檢視：${weekKey}`;
     if (hintEl) hintEl.innerText = `整個禮拜的任務分布總覽`;
     
+<<<<<<< HEAD
+    // 同樣直接讀 precomputeAllWeeks() 算好的快取
+=======
     calculateMainItems(weekKey);
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     const weekData = weeklyDataStore[weekKey] || {};
     let html = `<h4 style="margin:5px 0; color:#1a1a1a;">本週全部清單項目一覽：</h4>`;
 
@@ -222,7 +238,11 @@ function calculateAnnualSummaryStats() {
 
     for (let w = 1; w <= 53; w++) {
         const weekKey = `第 ${w} 週`;
+<<<<<<< HEAD
+        // 資料已由 precomputeAllWeeks() 算過，這裡不再重算
+=======
         calculateMainItems(weekKey);
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
         const weekData = weeklyDataStore[weekKey] || {};
         for (let mainKey in weekData) {
             if (!classifiedCounters[mainKey]) classifiedCounters[mainKey] = {};
@@ -259,6 +279,19 @@ function calculateAnnualSummaryStats() {
 }
 
 window.onload = () => {
+<<<<<<< HEAD
+    initFirebaseAuth(() => {
+        userDbRef.once('value').then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                globalAppData = data;
+                // tempTasks 在雲端可能是舊格式（陣列）或新格式（用 id 當 key 的物件），這裡統一轉回陣列供畫面使用
+                globalAppData.tempTasks = tempTasksObjectToArray(globalAppData.tempTasks);
+            }
+            window.globalAppData = globalAppData;
+            initCalendarGrid();
+        });
+=======
     auth.onAuthStateChanged((user) => {
         if (user) {
             userDbRef = db.ref('users/' + user.uid);
@@ -270,6 +303,7 @@ window.onload = () => {
         } else {
             auth.signInAnonymously();
         }
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     });
 };
 
@@ -287,6 +321,14 @@ function initCalendarGrid() {
     }
 
     selectedDateStr = todayStr;
+<<<<<<< HEAD
+
+    // 先把 53 週的資料一次算好放進快取，後面畫月曆格子/週視圖/年度統計都直接讀快取，
+    // 不會像以前一樣每畫一格、每點一次都重算一次整週資料。
+    precomputeAllWeeks();
+
+=======
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     renderMonthsCalendar(todayStr);
     renderWeeksCalendar();
     try { calculateAnnualSummaryStats(); } catch (e) {}

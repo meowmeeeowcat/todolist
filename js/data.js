@@ -116,6 +116,38 @@ function assembleTemporaryData(weekKey) {
     });
 }
 
+<<<<<<< HEAD
+// ================= tempTasks 儲存格式轉換 =================
+// 本機執行時 globalAppData.tempTasks 仍然是陣列（方便原本 .find/.filter/.forEach 的寫法）。
+// 但寫回 Firebase 時改成「用 task.id 當 key 的物件」，這樣才能針對單一臨時任務
+// 用 transaction 做局部更新（例如打卡 +1），而不必每次都整包蓋掉 tempTasks。
+function tempTasksArrayToObject(arr) {
+    const obj = {};
+    (arr || []).forEach(t => { obj[t.id] = t; });
+    return obj;
+}
+
+function tempTasksObjectToArray(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw; // 相容舊格式（曾經整包用 .set() 存成陣列的資料）
+    return Object.values(raw);
+}
+
+// daysInMonths / getWeekNumberByDate / compareWeeks 已搬到共用檔案 js/date-utils.js，
+// 這裡不再重複定義（html 需要在 data.js 之前載入 date-utils.js）。
+
+// 一次把 53 週的資料都算好放進快取，年曆頁只需要在初始化時呼叫一次，
+// 之後畫月曆格子、週視圖、年度統計都直接讀快取，不用每畫一格就重算一次。
+function precomputeAllWeeks() {
+    for (let w = 1; w <= 53; w++) {
+        calculateMainItems(`第 ${w} 週`);
+    }
+}
+
+// 注意：這個函式現在「不會」主動重新計算，只讀 weeklyDataStore 目前的快取內容。
+// 呼叫前請確保該週已經算過（例如先呼叫過 precomputeAllWeeks() 或 calculateMainItems(weekKey)）。
+function getWeekCompletionRate(weekKey) {
+=======
 const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 function getWeekNumberByDate(dateStr) {
@@ -139,6 +171,7 @@ function compareWeeks(w1, w2) {
 
 function getWeekCompletionRate(weekKey) {
     calculateMainItems(weekKey);
+>>>>>>> 80947b3a2ca44d2a3bdee1a734dde008e55d2d9a
     const weekData = window.weeklyDataStore[weekKey] || {};
     let total = 0;
     let completed = 0;
