@@ -244,14 +244,25 @@
 
     .control-actions-box {
         flex-direction: row;
+        flex-wrap: wrap;
         min-width: 0;
         width: 100%;
         box-sizing: border-box;
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .tab-btn {
+        flex: 1 1 45%;
+        text-align: center;
+        font-size: 13px;
+        padding: 10px 8px;
     }
 
     .summary-stats-section {
         width: 100%;
         box-sizing: border-box;
+        padding: 12px 14px;
     }
 
     .stats-classified-flex {
@@ -273,8 +284,23 @@
         box-sizing: border-box;
     }
 
+    .calendar-left {
+        padding: 12px;
+    }
+
+    /* 兩欄月曆卡片，卡片內距與格線間距都收窄，讓每格日期盡量留大 */
     .months-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .month-card {
+        padding: 6px;
+    }
+
+    .days-grid {
+        gap: 3px;
+        font-size: 12px;
     }
 
     .weeks-53-grid {
@@ -283,5 +309,28 @@
 
     .day-cell, .week-box-btn {
         font-size: 12px;
+        padding: 5px 0;
+    }
+}
+
+/* ================= RWD：小尺寸手機（寬度 480px 以下）================= */
+@media (max-width: 480px) {
+    /* 螢幕太窄時兩欄會讓每格日期小於 20px、難以點按，
+       改成一次只看一個月、佔滿整行寬度，格子自然變大許多。 */
+    .months-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .month-card {
+        padding: 10px;
+    }
+
+    .days-grid {
+        gap: 4px;
+        font-size: 13px;
+    }
+
+    .tab-btn {
+        flex: 1 1 100%;
     }
 }

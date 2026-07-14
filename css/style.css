@@ -315,6 +315,83 @@ button:hover {
     background-color: #059669;
 }
 
+/* ================= 登入 / 註冊畫面 ================= */
+.auth-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: #f0f4f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2100;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.login-box {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(54, 162, 235, 0.12);
+    width: 340px;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.login-box h2 {
+    margin: 0 0 4px 0;
+    color: #1a4d6c;
+    text-align: center;
+}
+
+.login-box input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.login-box button {
+    margin-top: 4px;
+}
+
+.login-error {
+    color: #d63031;
+    font-size: 14px;
+    background: #ffeaea;
+    border: 1px solid #ffd2d2;
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.login-switch-row {
+    text-align: center;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.login-switch-row a {
+    color: #36a2eb;
+    font-weight: bold;
+    text-decoration: none;
+    margin-left: 4px;
+}
+
+.login-switch-row a:hover {
+    text-decoration: underline;
+}
+
+.logout-btn {
+    background-color: #64748b;
+    padding: 8px 16px;
+}
+
+.logout-btn:hover {
+    background-color: #475569;
+}
+
 /* ================= 載入中遮罩 ================= */
 .loading-overlay {
     position: fixed;
@@ -409,5 +486,25 @@ button:hover {
 
     .form-row {
         flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .control-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .control-panel > div {
+        justify-content: space-between;
+    }
+
+    .control-panel select,
+    .control-panel button {
+        flex: 1;
+    }
+
+    .login-box {
+        padding: 22px;
     }
 }

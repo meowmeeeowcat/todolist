@@ -3,6 +3,12 @@
 // firebaseConfig / auth / db 的初始化已搬到共用檔案 js/firebase-init.js，
 // 這裡只呼叫 initFirebaseAuth() 並傳入「登入完成後要做的事」。
 initFirebaseAuth(() => {
+    // 使用者已登入：確保登入畫面收起、載入中畫面顯示，然後開始抓資料
+    const loginOverlayEl = document.getElementById('login-overlay');
+    if (loginOverlayEl) loginOverlayEl.classList.add('hidden');
+    const loadingOverlayEl = document.getElementById('loading-overlay');
+    if (loadingOverlayEl) loadingOverlayEl.classList.remove('hidden');
+
     // 【自動讀取本地週次與建立選單】
     const weekSelectEl = document.getElementById('week-select');
     if (weekSelectEl) {
@@ -28,6 +34,21 @@ initFirebaseAuth(() => {
 
     // 去雲端把資料抓下來
     loadDataFromStorage();
+}, () => {
+    // 使用者尚未登入（或剛登出）：收起載入畫面，顯示登入表單，
+    // 並重置「資料是否已載入」的狀態，避免登出後還能看到上一位使用者留在畫面/記憶體裡的舊資料。
+    const loadingOverlayEl = document.getElementById('loading-overlay');
+    if (loadingOverlayEl) loadingOverlayEl.classList.add('hidden');
+    const loginOverlayEl = document.getElementById('login-overlay');
+    if (loginOverlayEl) loginOverlayEl.classList.remove('hidden');
+
+    window.dataLoaded = false;
+    const viewCalendarBtnEl = document.getElementById('view-calendar-btn');
+    if (viewCalendarBtnEl) {
+        viewCalendarBtnEl.disabled = true;
+        viewCalendarBtnEl.title = '請先登入';
+    }
+    if (typeof switchPage === 'function') switchPage('todo');
 });
 
 // ================= 儲存 / 讀取 =================
