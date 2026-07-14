@@ -39,9 +39,15 @@ function initFirebaseAuth(onReady, onLoggedOut) {
     });
 }
 
-// 註冊新帳號（email + password），回傳 Promise
-function registerWithEmail(email, password) {
-    return window.auth.createUserWithEmailAndPassword(email, password);
+// 註冊新帳號（email + password + 暱稱），回傳 Promise
+// 暱稱存成 Firebase Auth 使用者的 displayName，之後 auth.currentUser.displayName 就能直接讀到
+function registerWithEmail(email, password, nickname) {
+    return window.auth.createUserWithEmailAndPassword(email, password).then((userCredential) => {
+        if (nickname) {
+            return userCredential.user.updateProfile({ displayName: nickname }).then(() => userCredential);
+        }
+        return userCredential;
+    });
 }
 
 // 用已存在的帳號登入，回傳 Promise
@@ -52,6 +58,14 @@ function loginWithEmail(email, password) {
 // 登出
 function logoutUser() {
     return window.auth.signOut();
+}
+
+// 設定登入狀態要不要「記住」：
+// LOCAL：關掉瀏覽器、重開網站都還是登入狀態（勾選「記住我」）
+// SESSION：只在這個分頁/瀏覽器工作階段有效，關掉分頁就要重新登入（取消勾選）
+function setAuthPersistence(remember) {
+    const mode = remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
+    return window.auth.setPersistence(mode);
 }
 
 // Firebase 常見錯誤代碼轉成中文提示

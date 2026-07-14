@@ -30,8 +30,13 @@
     <div id="login-overlay" class="auth-overlay hidden">
         <div class="login-box">
             <h2 id="login-title">登入</h2>
+            <input type="text" id="login-nickname" class="hidden" placeholder="暱稱（顯示在主頁上）" autocomplete="nickname">
             <input type="email" id="login-email" placeholder="電子郵件" autocomplete="username">
             <input type="password" id="login-password" placeholder="密碼" autocomplete="current-password">
+            <label class="remember-me-row">
+                <input type="checkbox" id="remember-me-checkbox" checked>
+                記住我（下次自動登入）
+            </label>
             <div id="login-error" class="login-error hidden"></div>
             <button id="login-submit-btn">登入</button>
             <div class="login-switch-row">
@@ -49,6 +54,7 @@
                 <button id="view-calendar-btn" onclick="switchPage('calendar')" disabled title="資料載入中...">查看年度年曆總覽</button>
             </div>
             <div>
+                <span id="user-greeting" class="user-greeting"></span>
                 <button id="back-btn" class="hidden">返回主面板</button>
                 <button id="logout-btn" class="logout-btn">登出</button>
             </div>

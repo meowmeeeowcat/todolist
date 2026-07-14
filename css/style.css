@@ -33,7 +33,7 @@ body {
     gap: 12px; /* 在第一週下拉選單與年曆按鈕之間增加 12px 的空隙 */
 }
 
-select, input[type="text"], input[type="number"], input[type="date"] {
+select, input[type="text"], input[type="number"], input[type="date"], input[type="email"], input[type="password"] {
     padding: 10px 14px;
     border-radius: 8px;
     border: 1px solid #ced4da;
@@ -331,30 +331,57 @@ button:hover {
 
 .login-box {
     background: white;
-    padding: 30px;
+    padding: 34px 30px;
     border-radius: 16px;
     box-shadow: 0 8px 30px rgba(54, 162, 235, 0.12);
-    width: 340px;
+    width: 360px;
     max-width: 100%;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 .login-box h2 {
-    margin: 0 0 4px 0;
+    margin: 0 0 6px 0;
     color: #1a4d6c;
     text-align: center;
+    font-size: 22px;
 }
 
 .login-box input {
     width: 100%;
     box-sizing: border-box;
+    padding: 13px 16px;
+    font-size: 16px;
 }
 
 .login-box button {
     margin-top: 4px;
+    padding: 13px 18px;
+    font-size: 16px;
+}
+
+.remember-me-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #475569;
+    user-select: none;
+}
+
+.remember-me-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.user-greeting {
+    font-size: 14px;
+    color: #475569;
+    font-weight: bold;
+    white-space: nowrap;
 }
 
 .login-error {
@@ -447,7 +474,7 @@ button:hover {
         gap: 8px;
     }
 
-    select, input[type="text"], input[type="number"], input[type="date"] {
+    select, input[type="text"], input[type="number"], input[type="date"], input[type="email"], input[type="password"] {
         font-size: 15px;
     }
 
@@ -505,6 +532,7 @@ button:hover {
     }
 
     .login-box {
-        padding: 22px;
+        padding: 24px 20px;
+        gap: 12px;
     }
 }

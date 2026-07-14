@@ -9,6 +9,15 @@ initFirebaseAuth(() => {
     const loadingOverlayEl = document.getElementById('loading-overlay');
     if (loadingOverlayEl) loadingOverlayEl.classList.remove('hidden');
 
+    // 在主頁顯示暱稱（註冊時填的暱稱存在 Firebase Auth 的 displayName 裡；
+    // 如果是舊帳號沒填過暱稱，就退而顯示 email）
+    const greetingEl = document.getElementById('user-greeting');
+    if (greetingEl && window.auth.currentUser) {
+        const displayName = window.auth.currentUser.displayName;
+        const email = window.auth.currentUser.email;
+        greetingEl.innerText = displayName ? `哈囉，${displayName}` : (email ? `哈囉，${email}` : '');
+    }
+
     // 【自動讀取本地週次與建立選單】
     const weekSelectEl = document.getElementById('week-select');
     if (weekSelectEl) {
@@ -48,6 +57,8 @@ initFirebaseAuth(() => {
         viewCalendarBtnEl.disabled = true;
         viewCalendarBtnEl.title = '請先登入';
     }
+    const greetingEl = document.getElementById('user-greeting');
+    if (greetingEl) greetingEl.innerText = '';
     if (typeof switchPage === 'function') switchPage('todo');
 });
 
