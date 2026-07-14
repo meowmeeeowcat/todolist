@@ -8,7 +8,7 @@
     <title>每週必做事項與年度年曆看板</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/calendar.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js" defer></script>
@@ -16,6 +16,11 @@
 </head>
 
 <body>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div>資料載入中...</div>
+    </div>
 
     <!-- ================= 每週必做事項頁（預設顯示） ================= -->
     <div id="view-todo" class="container">

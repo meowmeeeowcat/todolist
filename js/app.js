@@ -113,6 +113,8 @@ function loadDataFromStorage() {
             viewCalendarBtn.disabled = false;
             viewCalendarBtn.title = '';
         }
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
     });
 }
 // =======================================================

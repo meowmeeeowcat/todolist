@@ -26,12 +26,14 @@ function getWeekNumberByDate(dateStr) {
     return (w >= 1 && w <= 53) ? `第 ${w} 週` : null;
 }
 
-// 給年曆頁用的版本（輸入月份 index + 日），內部改為直接複用上面同一套邏輯
+// 給年曆頁用的版本（輸入月份 index + 日），回傳「純數字」週次（例如 29），
+// 呼叫端（calendar.js）自己會包成 "第 29 週" 這種顯示文字，所以這裡不能再包一次，
+// 否則會變成「第 第 29 週 週」這種重複顯示的 bug。
 function getWeekNumberFor2026(monthIndex, day) {
     const dateStr = formatDateString(monthIndex, day);
-    const weekStr = getWeekNumberByDate(dateStr);
-    // getWeekNumberByDate 找不到時理論上不會發生（年曆頁本身就是照 2026 天數畫的），保底回傳第53週避免出錯
-    return weekStr || `第 53 週`;
+    const weekStr = getWeekNumberByDate(dateStr); // 回傳 "第 X 週" 或 null
+    if (!weekStr) return 53; // 理論上不會發生，保底回傳第53週避免出錯
+    return parseInt(weekStr.replace(/[^0-9]/g, ''), 10);
 }
 
 function compareWeeks(w1, w2) {

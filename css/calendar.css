@@ -229,3 +229,59 @@
 .regular-progress-item { margin-bottom: 10px; font-size: 14px; }
 .regular-progress-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
 .no-data-hint { color: #94a3b8; font-style: italic; font-size: 14px; }
+
+/* ================= RWD：手機版（寬度 768px 以下）================= */
+@media (max-width: 768px) {
+    .calendar-main-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .calendar-top-dashboard {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .control-actions-box {
+        flex-direction: row;
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .summary-stats-section {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .stats-classified-flex {
+        justify-content: center;
+    }
+
+    .category-group-card {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .calendar-dashboard {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .calendar-left, .calendar-right {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .months-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .weeks-53-grid {
+        grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+    }
+
+    .day-cell, .week-box-btn {
+        font-size: 12px;
+    }
+}

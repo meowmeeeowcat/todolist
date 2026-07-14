@@ -314,3 +314,100 @@ button:hover {
 .archive-btn:hover {
     background-color: #059669;
 }
+
+/* ================= 載入中遮罩 ================= */
+.loading-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: #f0f4f8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 2000;
+    color: #1a4d6c;
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #e2e8f0;
+    border-top-color: #4bc0c0;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ================= RWD：手機版（寬度 768px 以下）================= */
+@media (max-width: 768px) {
+    body {
+        align-items: flex-start;
+        padding: 12px 0;
+    }
+
+    .container {
+        width: 100%;
+        max-width: 100%;
+        padding: 16px;
+        border-radius: 12px;
+        box-sizing: border-box;
+    }
+
+    .control-panel {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .control-panel > div {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    select, input[type="text"], input[type="number"], input[type="date"] {
+        font-size: 15px;
+    }
+
+    .main-content {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .left-column {
+        width: 100%;
+    }
+
+    .chart-wrapper {
+        width: 100%;
+        max-width: 320px;
+        height: 320px;
+        margin: 0 auto;
+    }
+
+    #chart-title {
+        font-size: 22px;
+        text-align: center;
+    }
+
+    .todo-item {
+        height: auto;
+        min-height: 24px;
+        flex-wrap: wrap;
+    }
+
+    .modal-content {
+        width: 90%;
+        max-width: 400px;
+        padding: 18px;
+    }
+
+    .form-row {
+        flex-wrap: wrap;
+    }
+}
