@@ -4,22 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://www.gstatic.com">
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
-    <title>每週必做事項排程看板</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <title>每週必做事項與年度年曆看板</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/calendar.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js" defer></script>
+    <link rel="icon" href="data:,">
 </head>
 
 <body>
 
-    <div class="container">
+    <!-- ================= 每週必做事項頁（預設顯示） ================= -->
+    <div id="view-todo" class="container">
         <div class="control-panel">
             <div>
                 <select id="week-select"></select>
-                <button id="view-calendar-btn" onclick="window.location.href='calendar.html'">查看年度年曆總覽</button>
+                <button id="view-calendar-btn" onclick="switchPage('calendar')" disabled title="資料載入中...">查看年度年曆總覽</button>
             </div>
             <button id="back-btn" class="hidden">返回主面板</button>
         </div>
@@ -45,6 +48,42 @@
         </div>
     </div>
 
+    <!-- ================= 年度年曆看板頁（預設隱藏，切換時才顯示） ================= -->
+    <div id="view-calendar" class="container calendar-main-container hidden">
+        <div class="control-panel">
+            <h2>2026 年度數據智慧年曆看板</h2>
+            <button id="nav-back-btn" onclick="switchPage('todo')">返回主圖表頁</button>
+        </div>
+
+        <div class="calendar-top-dashboard">
+            <div class="control-actions-box">
+                <button id="tab-months" class="tab-btn active" onclick="switchView('months')">12個月傳統年曆</button>
+                <button id="tab-weeks" class="tab-btn" onclick="switchView('weeks')">53週週達成率視圖</button>
+            </div>
+            
+            <div class="summary-stats-section">
+                <h3>全年度任務執行總次數累計看板（分類別統整）</h3>
+                <div id="annual-stats-classified-container" class="stats-classified-flex">
+                    <div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="calendar-dashboard">
+            <div class="calendar-left">
+                <div id="months-view-container" class="months-grid"></div>
+                <div id="weeks-view-container" class="weeks-53-grid hidden"></div>
+            </div>
+
+            <div class="calendar-right">
+                <h3 id="focus-date-title">讀取中...</h3>
+                <div id="focus-date-week-hint"></div>
+                <div id="focus-date-details">選擇年曆上的日期查看當天進度。</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 新增/編輯任務彈出視窗（兩個頁面共用，放在外層） ================= -->
     <div id="task-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -90,5 +129,7 @@
     <script src="js/data.js" defer></script>
     <script src="js/chart.js" defer></script>
     <script src="js/app.js" defer></script>
+    <script src="js/calendar.js" defer></script>
+    <script src="js/spa.js" defer></script>
 </body>
 </html>

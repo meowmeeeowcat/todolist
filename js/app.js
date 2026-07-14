@@ -104,6 +104,15 @@ function loadDataFromStorage() {
         }
         window.globalAppData = globalAppData;
         updateView();
+
+        // 資料已經抓好了，這時候才把「查看年度年曆總覽」按鈕打開，
+        // 避免使用者在資料還沒載入完成前就切過去看到空白畫面。
+        window.dataLoaded = true;
+        const viewCalendarBtn = document.getElementById('view-calendar-btn');
+        if (viewCalendarBtn) {
+            viewCalendarBtn.disabled = false;
+            viewCalendarBtn.title = '';
+        }
     });
 }
 // =======================================================

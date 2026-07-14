@@ -228,20 +228,10 @@ function calculateAnnualSummaryStats() {
     if (!hasAnyData) container.innerHTML = `<div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>`;
 }
 
-window.onload = () => {
-    initFirebaseAuth(() => {
-        userDbRef.once('value').then((snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                globalAppData = data;
-                // tempTasks 在雲端可能是舊格式（陣列）或新格式（用 id 當 key 的物件），這裡統一轉回陣列供畫面使用
-                globalAppData.tempTasks = tempTasksObjectToArray(globalAppData.tempTasks);
-            }
-            window.globalAppData = globalAppData;
-            initCalendarGrid();
-        });
-    });
-};
+// window.onload 的 Firebase 登入與資料讀取已統一交給 js/app.js 處理
+// （SPA 架構下整個網站只登入一次、只抓一次資料）。
+// initCalendarGrid() 現在改由 js/spa.js 的 switchPage('calendar') 呼叫，
+// 每次切換到年曆頁時執行，讀取當下已經在記憶體裡的 globalAppData。
 
 function initCalendarGrid() {
     const systemDate = new Date();
