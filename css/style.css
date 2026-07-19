@@ -16,7 +16,8 @@ body {
     padding: 30px;
     border-radius: 16px;
     box-shadow: 0 8px 30px rgba(54, 162, 235, 0.08);
-    width: 900px;
+    width: 1100px;
+    max-width: 96vw;
 }
 
 /* 控制面板佈局：下拉選單與年曆按鈕靠左緊鄰 */
@@ -76,6 +77,7 @@ select:focus, input:focus {
 
 .todo-list-wrapper {
     flex-grow: 1;
+    flex-basis: 0;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
@@ -83,6 +85,17 @@ select:focus, input:focus {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+}
+
+/* 臨時待辦清單：跟主項目清單同樣的排版，用淡橘色調做出區隔，提醒這是「不計入總覽」的臨時任務 */
+.temp-task-list-wrapper {
+    background: #fff7ed;
+    border-color: #fed7aa;
+}
+
+/* 手機版才會用到的「項目清單 / 代辦清單」切換按鈕，桌面版預設不顯示 */
+.mobile-list-tabs {
+    display: none;
 }
 
 .list-header {
@@ -169,9 +182,9 @@ select:focus, input:focus {
 .actions {
     display: none !important;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
-.todo-list-wrapper.editing-mode .actions {
+.editing-mode .actions {
     display: flex !important;
 }
 
@@ -179,8 +192,23 @@ select:focus, input:focus {
     display: flex;
     align-items: center;
 }
-.todo-list-wrapper.editing-mode .sub-counter {
+.editing-mode .sub-counter {
     display: none !important;
+}
+
+.move-btn {
+    background-color: #94a3b8;
+    padding: 5px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+}
+.move-btn:hover {
+    background-color: #64748b;
+}
+.move-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background-color: #94a3b8;
 }
 
 /* ================= 彈出視窗 (Modal) 樣式 ================= */
@@ -513,6 +541,28 @@ button:hover {
 
     .form-row {
         flex-wrap: wrap;
+    }
+
+    /* 手機版：項目清單／代辦清單改成用按鈕切換，不會同時擠在畫面上 */
+    .mobile-list-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .mobile-list-tabs .tab-btn {
+        flex: 1;
+        text-align: center;
+        padding: 10px 8px;
+        font-size: 14px;
+    }
+
+    .todo-list-wrapper, .temp-task-list-wrapper {
+        width: 100%;
+    }
+
+    .mobile-tab-hidden {
+        display: none !important;
     }
 }
 

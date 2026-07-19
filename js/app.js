@@ -193,7 +193,8 @@ const paletteContainer = document.getElementById('color-palette-container');
 let currentWeek = "第 1 週";
 let currentView = 'main'; 
 let currentSubKey = null;
-let editingContext = null; 
+let editingContext = null;
+let fullWeekData = {}; // 尚未過濾臨時任務的完整週資料，給「新增任務」下拉選單、顏色繼承用
 
 // 動態渲染 10 色選擇按鈕
 function renderColorPalette() {
@@ -232,6 +233,29 @@ function openModal(title) {
     taskModal.classList.remove('hidden');
     updateCategorySelectOptions();
     renderColorPalette(); // 開啟時載入調色盤
+    toggleColorPickerVisibility();
+}
+
+// 只有「新增全新大類別」時才需要挑顏色；幫既有分類新增子項目時，直接沿用該分類本身的顏色，不用再選一次。
+// 編輯模式（editingContext 有值）維持原本行為，一律顯示調色盤。
+function toggleColorPickerVisibility() {
+    const colorSection = document.getElementById('color-picker-section');
+    if (!colorSection) return;
+    if (editingContext) {
+        colorSection.classList.remove('hidden');
+        return;
+    }
+    const isNewCategory = (categorySelect.value === '__new__');
+    colorSection.classList.toggle('hidden', !isNewCategory);
+}
+
+// 找出某個分類目前使用的色相：優先看常規範本裡的設定，找不到（例如純臨時分類）就從已存在的臨時任務裡借一個
+function findCategoryHue(categoryName) {
+    if (globalAppData.template[categoryName] && globalAppData.template[categoryName].customHue !== undefined) {
+        return globalAppData.template[categoryName].customHue;
+    }
+    const existingTemp = globalAppData.tempTasks.find(t => t.category === categoryName && t.customHue !== undefined);
+    return existingTemp ? existingTemp.customHue : undefined;
 }
 
 function closeModal() {
@@ -254,6 +278,8 @@ function closeModal() {
     toggleCategoryInput();
     
     todoListWrapper.classList.remove('editing-mode');
+    const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
+    if (tempListWrapperEl) tempListWrapperEl.classList.remove('editing-mode');
 }
 
 openAddModalBtn.addEventListener('click', () => {
@@ -262,6 +288,8 @@ openAddModalBtn.addEventListener('click', () => {
 
 openEditModalBtn.addEventListener('click', () => {
     todoListWrapper.classList.toggle('editing-mode');
+    const tempListWrapper = document.getElementById('temp-task-list-wrapper');
+    if (tempListWrapper) tempListWrapper.classList.toggle('editing-mode', todoListWrapper.classList.contains('editing-mode'));
 });
 
 closeModalBtn.addEventListener('click', closeModal);
@@ -312,14 +340,17 @@ function toggleCategoryInput() {
         newCategoryInput.classList.add('hidden');
     }
 }
-categorySelect.addEventListener('change', toggleCategoryInput);
+categorySelect.addEventListener('change', () => {
+    toggleCategoryInput();
+    toggleColorPickerVisibility();
+});
 
-function renderTodoList() {
+function renderTodoList(weekData) {
     listContainer.innerHTML = '';
-    const weekData = weeklyDataStore[currentWeek];
 
     if (currentView === 'main') {
-        for (let key in weekData) {
+        const orderedKeys = sortKeysByOrder(weekData);
+        orderedKeys.forEach((key, index) => {
             const item = weekData[key];
             const li = document.createElement('li');
             li.className = 'todo-item';
@@ -331,6 +362,8 @@ function renderTodoList() {
                     <b>${key}</b>
                 </div>
                 <span class="actions">
+                    <button class="move-btn move-up-btn" title="往上移" ${index === 0 ? 'disabled' : ''}>▲</button>
+                    <button class="move-btn move-down-btn" title="往下移" ${index === orderedKeys.length - 1 ? 'disabled' : ''}>▼</button>
                     <button class="archive-btn">完成</button>
                     <button class="edit-btn">編輯</button>
                     <button class="delete-btn">刪除</button>
@@ -343,6 +376,22 @@ function renderTodoList() {
                 currentView = 'sub';
                 currentSubKey = key;
                 updateView();
+            });
+
+            li.querySelector('.move-up-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (swapOrder(globalAppData.template, orderedKeys, key, -1)) {
+                    saveTemplate();
+                    updateView();
+                }
+            });
+
+            li.querySelector('.move-down-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (swapOrder(globalAppData.template, orderedKeys, key, 1)) {
+                    saveTemplate();
+                    updateView();
+                }
             });
 
             li.querySelector('.archive-btn').addEventListener('click', (e) => {
@@ -405,10 +454,11 @@ function renderTodoList() {
             });
 
             listContainer.appendChild(li);
-        }
+        });
     } else {
-        const subItems = weekData[currentSubKey].subItems;
-        for (let originalKey in subItems) {
+        const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
+        const orderedSubKeys = sortKeysByOrder(subItems);
+        orderedSubKeys.forEach((originalKey, index) => {
             const subItem = subItems[originalKey];
             const li = document.createElement('li');
             li.className = 'todo-item';
@@ -425,43 +475,50 @@ function renderTodoList() {
                     <button class="counter-btn plus-btn">+</button>
                 </span>
                 <span class="actions">
+                    <button class="move-btn move-up-btn" title="往上移" ${index === 0 ? 'disabled' : ''}>▲</button>
+                    <button class="move-btn move-down-btn" title="往下移" ${index === orderedSubKeys.length - 1 ? 'disabled' : ''}>▼</button>
                     <button class="archive-btn">完成</button>
                     <button class="edit-btn">編輯</button>
                     <button class="delete-btn">刪除</button>
                 </span>
             `;
 
+            li.querySelector('.move-up-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const subItemsSource = globalAppData.template[currentSubKey].subItems;
+                if (swapOrder(subItemsSource, orderedSubKeys, originalKey, -1)) {
+                    saveTemplate();
+                    updateView();
+                }
+            });
+
+            li.querySelector('.move-down-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const subItemsSource = globalAppData.template[currentSubKey].subItems;
+                if (swapOrder(subItemsSource, orderedSubKeys, originalKey, 1)) {
+                    saveTemplate();
+                    updateView();
+                }
+            });
+
             li.querySelector('.archive-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (subItem.isTemp) {
-                    if (!confirm("確定將此臨時任務標記為完結並在列表上隱藏嗎？")) return;
-                    const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
-                    if (task) task.archived = true;
-                    saveTempTasksTree();
-                } else {
-                    if (!confirm(`確定將常規子任務「${originalKey}」完結嗎？\n此項目將從【${currentWeek}】起往後的週次消失，但歷史完成數據均會安全保留。`)) return;
-                    if (globalAppData.template[currentSubKey] && globalAppData.template[currentSubKey].subItems[originalKey]) {
-                        globalAppData.template[currentSubKey].subItems[originalKey].archived = true;
-                        globalAppData.template[currentSubKey].subItems[originalKey].archivedFromWeek = currentWeek;
-                    }
-                    saveTemplate();
+                if (!confirm(`確定將常規子任務「${originalKey}」完結嗎？\n此項目將從【${currentWeek}】起往後的週次消失，但歷史完成數據均會安全保留。`)) return;
+                if (globalAppData.template[currentSubKey] && globalAppData.template[currentSubKey].subItems[originalKey]) {
+                    globalAppData.template[currentSubKey].subItems[originalKey].archived = true;
+                    globalAppData.template[currentSubKey].subItems[originalKey].archivedFromWeek = currentWeek;
                 }
+                saveTemplate();
                 updateView();
             });
 
             li.querySelector('.plus-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (subItem.completed < subItem.total) {
-                    if (subItem.isTemp) {
-                        const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
-                        if (task) task.completed++;
-                        syncTempTaskCounter(subItem.tempId, 1);
-                    } else {
-                        if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
-                        if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
-                        globalAppData.progress[currentWeek][originalKey]++;
-                        syncRegularCounter(currentWeek, originalKey, 1);
-                    }
+                    if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
+                    if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
+                    globalAppData.progress[currentWeek][originalKey]++;
+                    syncRegularCounter(currentWeek, originalKey, 1);
                     updateView();
                 }
             });
@@ -469,16 +526,10 @@ function renderTodoList() {
             li.querySelector('.minus-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (subItem.completed > 0) {
-                    if (subItem.isTemp) {
-                        const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
-                        if (task) task.completed--;
-                        syncTempTaskCounter(subItem.tempId, -1);
-                    } else {
-                        if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
-                        if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
-                        globalAppData.progress[currentWeek][originalKey]--;
-                        syncRegularCounter(currentWeek, originalKey, -1);
-                    }
+                    if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
+                    if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
+                    globalAppData.progress[currentWeek][originalKey]--;
+                    syncRegularCounter(currentWeek, originalKey, -1);
                     updateView();
                 }
             });
@@ -489,14 +540,9 @@ function renderTodoList() {
                 
                 openModal("編輯任務：" + originalKey);
                 
-                taskTypeSelect.value = subItem.isTemp ? 'temporary' : 'regular';
+                taskTypeSelect.value = 'regular';
                 taskTypeSelect.disabled = true;
                 toggleTaskTypeView();
-                
-                if(subItem.isTemp) {
-                    const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
-                    if(task) newTaskDateInput.value = task.date;
-                }
                 newTaskDateInput.disabled = true;
 
                 newTaskNameInput.value = originalKey;
@@ -515,23 +561,16 @@ function renderTodoList() {
 
             li.querySelector('.delete-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (subItem.isTemp) {
-                    if (confirm(`確定要刪除此臨時任務嗎？`)) {
-                        globalAppData.tempTasks = deleteTempTaskFilter(subItem.tempId);
-                        saveTempTasksTree();
-                    }
-                } else {
-                    if (!confirm("【全週同步刪除】這會將全年度所有週次的此任務刪除！確定嗎？")) return;
-                    delete globalAppData.template[currentSubKey].subItems[originalKey];
-                    for (let w in globalAppData.progress) { delete globalAppData.progress[w][originalKey]; }
-                    saveTemplate();
-                    saveProgressTree();
-                }
+                if (!confirm("【全週同步刪除】這會將全年度所有週次的此任務刪除！確定嗎？")) return;
+                delete globalAppData.template[currentSubKey].subItems[originalKey];
+                for (let w in globalAppData.progress) { delete globalAppData.progress[w][originalKey]; }
+                saveTemplate();
+                saveProgressTree();
                 updateView();
             });
 
             listContainer.appendChild(li);
-        }
+        });
     }
 }
 
@@ -539,9 +578,143 @@ function deleteTempTaskFilter(tempId) {
     return globalAppData.tempTasks.filter(t => t.id !== tempId);
 }
 
+// 取得本週還沒封存的臨時任務（依 order 排序）
+function getTempTasksForWeek(weekKey) {
+    const tasks = (globalAppData.tempTasks || []).filter(t => !t.archived && getWeekNumberByDate(t.date) === weekKey);
+    tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    return tasks;
+}
+
+// 渲染主頁旁邊的「臨時待辦」清單：這些任務不計入主頁的圖表/總覽統計
+function renderTempTaskList() {
+    const container = document.getElementById('temp-task-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const tasks = getTempTasksForWeek(currentWeek);
+
+    if (tasks.length === 0) {
+        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">本週尚無臨時任務，點「新增項目」並選擇「按特定日期臨時任務」即可加入。</li>`;
+        return;
+    }
+
+    tasks.forEach((task, index) => {
+        const li = document.createElement('li');
+        li.className = 'todo-item';
+        li.style.cursor = 'default';
+        li.style.borderLeft = `5px solid ${task.color || '#94a3b8'}`;
+
+        li.innerHTML = `
+            <div class="todo-item-clickable-area">
+                <span class="todo-item-progress-tag" style="background:#ffedd5; color:#9a3412;">${task.category || '臨時任務'}</span>
+                <b>${task.name}</b>
+            </div>
+            <span class="sub-counter">
+                <button class="counter-btn minus-btn">-</button>
+                <span>${task.completed} / ${task.total}</span>
+                <button class="counter-btn plus-btn">+</button>
+            </span>
+            <span class="actions">
+                <button class="move-btn move-up-btn" title="往上移" ${index === 0 ? 'disabled' : ''}>▲</button>
+                <button class="move-btn move-down-btn" title="往下移" ${index === tasks.length - 1 ? 'disabled' : ''}>▼</button>
+                <button class="archive-btn">完成</button>
+                <button class="edit-btn">編輯</button>
+                <button class="delete-btn">刪除</button>
+            </span>
+        `;
+
+        li.querySelector('.move-up-btn').addEventListener('click', () => {
+            if (swapArrayOrder(globalAppData.tempTasks, tasks, task.id, -1, 'id')) {
+                saveTempTasksTree();
+                updateView();
+            }
+        });
+        li.querySelector('.move-down-btn').addEventListener('click', () => {
+            if (swapArrayOrder(globalAppData.tempTasks, tasks, task.id, 1, 'id')) {
+                saveTempTasksTree();
+                updateView();
+            }
+        });
+
+        li.querySelector('.plus-btn').addEventListener('click', () => {
+            if (task.completed < task.total) {
+                task.completed++;
+                syncTempTaskCounter(task.id, 1);
+                updateView();
+            }
+        });
+        li.querySelector('.minus-btn').addEventListener('click', () => {
+            if (task.completed > 0) {
+                task.completed--;
+                syncTempTaskCounter(task.id, -1);
+                updateView();
+            }
+        });
+
+        li.querySelector('.archive-btn').addEventListener('click', () => {
+            if (!confirm("確定將此臨時任務標記為完結並在列表上隱藏嗎？")) return;
+            task.archived = true;
+            saveTempTasksTree();
+            updateView();
+        });
+
+        li.querySelector('.edit-btn').addEventListener('click', () => {
+            editingContext = { type: 'sub-item', originalKey: task.name, subItem: { isTemp: true, tempId: task.id, total: task.total, customHue: task.customHue } };
+
+            openModal("編輯臨時任務：" + task.name);
+
+            taskTypeSelect.value = 'temporary';
+            taskTypeSelect.disabled = true;
+            toggleTaskTypeView();
+
+            newTaskDateInput.value = task.date;
+            newTaskDateInput.disabled = true;
+
+            newTaskNameInput.value = task.name;
+            newTaskTotalInput.value = task.total;
+
+            if (task.customHue !== undefined) {
+                const foundColor = fixedPalette.find(p => p.hue === task.customHue);
+                if (foundColor) selectedPaletteItem = foundColor;
+            } else {
+                selectedPaletteItem = fixedPalette[0];
+            }
+            renderColorPalette();
+        });
+
+        li.querySelector('.delete-btn').addEventListener('click', () => {
+            if (confirm("確定要刪除此臨時任務嗎？")) {
+                globalAppData.tempTasks = deleteTempTaskFilter(task.id);
+                saveTempTasksTree();
+                updateView();
+            }
+        });
+
+        container.appendChild(li);
+    });
+}
+
+// 手機版：在「項目清單」跟「代辦清單（臨時任務）」之間切換
+function switchMobileListTab(tab) {
+    const leftColumnEl = document.querySelector('.left-column');
+    const todoWrapperEl = document.getElementById('todo-list-wrapper');
+    const tempWrapperEl = document.getElementById('temp-task-list-wrapper');
+    const mainTabBtn = document.getElementById('mobile-tab-main');
+    const tempTabBtn = document.getElementById('mobile-tab-temp');
+    if (!leftColumnEl || !todoWrapperEl || !tempWrapperEl) return;
+
+    const showTemp = (tab === 'temp');
+    leftColumnEl.classList.toggle('mobile-tab-hidden', showTemp);
+    todoWrapperEl.classList.toggle('mobile-tab-hidden', showTemp);
+    tempWrapperEl.classList.toggle('mobile-tab-hidden', !showTemp);
+    if (mainTabBtn) mainTabBtn.classList.toggle('active', !showTemp);
+    if (tempTabBtn) tempTabBtn.classList.toggle('active', showTemp);
+}
+
 function updateView() {
     calculateMainItems(currentWeek);
-    const weekData = weeklyDataStore[currentWeek];
+    fullWeekData = weeklyDataStore[currentWeek];
+    const weekData = getRegularOnlyWeekData(fullWeekData); // 主頁圖表/項目清單只看常規任務，臨時任務不計入總覽
 
     if (currentView === 'main') {
         titleEl.innerText = currentWeek + " - 必做事項總覽";
@@ -565,20 +738,21 @@ function updateView() {
         titleEl.innerText = currentSubKey + " - 分項進度";
         backBtn.classList.remove('hidden');
 
-        const subItems = weekData[currentSubKey].subItems;
+        const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
         const subChartData = getChartData(subItems, true);
         renderPieChart('todoChart', subChartData, null);
     }
 
-    renderTodoList();
+    renderTodoList(weekData);
+    renderTempTaskList();
     if (!taskModal.classList.contains('hidden')) {
         updateCategorySelectOptions();
     }
 }
 
 addTaskBtn.addEventListener('click', () => {
-    const chosenColor = selectedPaletteItem.color;
-    const chosenHue = selectedPaletteItem.hue;
+    let chosenColor = selectedPaletteItem.color;
+    let chosenHue = selectedPaletteItem.hue;
     
     if (editingContext) {
         if (editingContext.type === 'main-category') {
@@ -659,6 +833,7 @@ addTaskBtn.addEventListener('click', () => {
     }
 
     let targetCategory = categorySelect.value;
+    const wasNewCategory = (targetCategory === '__new__');
     const taskName = newTaskNameInput.value.trim();
     const taskTotal = parseInt(newTaskTotalInput.value, 10) || 1;
 
@@ -674,9 +849,21 @@ addTaskBtn.addEventListener('click', () => {
             targetCategory = catName;
         } else {
             if (!globalAppData.template[catName]) {
-                globalAppData.template[catName] = { subItems: {}, customHue: selectedPaletteItem.hue };
+                const existingCategoryCount = Object.keys(globalAppData.template).length;
+                globalAppData.template[catName] = { subItems: {}, customHue: selectedPaletteItem.hue, order: existingCategoryCount };
             }
             targetCategory = catName;
+        }
+    }
+
+    // 幫既有分類新增子項目時（不是新建大類別），顏色直接沿用該分類本身的顏色，
+    // 不使用調色盤目前選到的顏色——因為這種情況下畫面上本來就不給選顏色了。
+    if (!wasNewCategory) {
+        const existingHue = findCategoryHue(targetCategory);
+        if (existingHue !== undefined) {
+            chosenHue = existingHue;
+            const found = fixedPalette.find(p => p.hue === existingHue);
+            chosenColor = found ? found.color : `hsl(${existingHue}, 100%, 85%)`;
         }
     }
 
@@ -687,6 +874,7 @@ addTaskBtn.addEventListener('click', () => {
         const computedWeek = getWeekNumberByDate(selectedDate);
         if (!computedWeek) { alert("選擇的日期超出範圍！"); return; }
 
+        const sameWeekCount = getTempTasksForWeek(computedWeek).length;
         globalAppData.tempTasks.push({
             id: Date.now(),
             date: selectedDate,
@@ -695,12 +883,14 @@ addTaskBtn.addEventListener('click', () => {
             total: taskTotal,
             completed: 0,
             color: chosenColor,
-            customHue: chosenHue
+            customHue: chosenHue,
+            order: sameWeekCount
         });
         saveTempTasksTree();
         alert(`新增成功！臨時任務已排入：${computedWeek}`);
     } else {
-        globalAppData.template[targetCategory].subItems[taskName] = { total: taskTotal, customHue: chosenHue };
+        const existingSubCount = Object.keys(globalAppData.template[targetCategory].subItems).length;
+        globalAppData.template[targetCategory].subItems[taskName] = { total: taskTotal, customHue: chosenHue, order: existingSubCount };
         saveTemplate();
     }
 
