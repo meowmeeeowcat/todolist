@@ -18,28 +18,9 @@ initFirebaseAuth(() => {
         greetingEl.innerText = displayName ? `哈囉，${displayName}` : (email ? `哈囉，${email}` : '');
     }
 
-    // 【自動讀取本地週次與建立選單】
-    const weekSelectEl = document.getElementById('week-select');
-    if (weekSelectEl) {
-        weekSelectEl.innerHTML = '';
-        for (let w = 1; w <= 53; w++) {
-            const opt = document.createElement('option');
-            opt.value = `第 ${w} 週`; opt.innerText = `第 ${w} 週`;
-            weekSelectEl.appendChild(opt);
-        }
-
-        const systemDate = new Date();
-        let computedWeekStr = "第 1 週";
-        if (systemDate.getFullYear() === 2026) {
-            const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
-            const dd = String(systemDate.getDate()).padStart(2, '0');
-            const todayStr = `2026-${mm}-${dd}`;
-            const wNum = getWeekNumberByDate(todayStr);
-            if (wNum) computedWeekStr = wNum;
-        }
-        currentWeek = computedWeekStr;
-        weekSelectEl.value = computedWeekStr;
-    }
+    // 【自動計算目前週次，並更新新版的週次選擇器（表格式）】
+    currentWeek = getTodayWeekKey() || "第 1 週";
+    updateWeekPickerLabel();
 
     // 去雲端把資料抓下來
     loadDataFromStorage();
@@ -61,6 +42,22 @@ initFirebaseAuth(() => {
     if (greetingEl) greetingEl.innerText = '';
     if (typeof switchPage === 'function') switchPage('todo');
 });
+
+// 今天的日期字串（2026 年格式），系統年份不是 2026 時退而回傳固定預設值
+function getTodayDateStr2026() {
+    const systemDate = new Date();
+    if (systemDate.getFullYear() === 2026) {
+        const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(systemDate.getDate()).padStart(2, '0');
+        return `2026-${mm}-${dd}`;
+    }
+    return '2026-01-01';
+}
+
+// 今天所屬的週次（"第 X 週"），算不出來（系統年份不是 2026）就回傳 null
+function getTodayWeekKey() {
+    return getWeekNumberByDate(getTodayDateStr2026());
+}
 
 // ================= 儲存 / 讀取 =================
 // 原本每次改一點點資料，就 userDbRef.set(globalAppData) 把「全部」資料整包蓋掉雲端，
@@ -153,7 +150,10 @@ function loadDataFromStorage() {
 const titleEl = document.getElementById('chart-title');
 const backBtn = document.getElementById('back-btn');
 const listContainer = document.getElementById('todo-list');
-const weekSelect = document.getElementById('week-select');
+const weekPickerToggleBtn = document.getElementById('week-picker-toggle-btn');
+const weekPickerPanel = document.getElementById('week-picker-panel');
+const weekPickerGrid = document.getElementById('week-picker-grid');
+const weekPickerCurrentLabel = document.getElementById('week-picker-current-label');
 const todoListWrapper = document.getElementById('todo-list-wrapper');
 
 const taskTypeSelect = document.getElementById('task-type-select');
@@ -236,11 +236,16 @@ function openModal(title) {
     toggleColorPickerVisibility();
 }
 
-// 只有「新增全新大類別」時才需要挑顏色；幫既有分類新增子項目時，直接沿用該分類本身的顏色，不用再選一次。
-// 編輯模式（editingContext 有值）維持原本行為，一律顯示調色盤。
+// 臨時任務不用選顏色（統一用固定色，跟項目清單同色調）；
+// 常規任務只有「新增全新大類別」時才需要挑顏色，幫既有分類新增子項目時直接沿用該分類本身的顏色。
+// 編輯模式（editingContext 有值）維持原本行為，常規任務一律顯示調色盤。
 function toggleColorPickerVisibility() {
     const colorSection = document.getElementById('color-picker-section');
     if (!colorSection) return;
+    if (taskTypeSelect.value === 'temporary') {
+        colorSection.classList.add('hidden');
+        return;
+    }
     if (editingContext) {
         colorSection.classList.remove('hidden');
         return;
@@ -274,6 +279,9 @@ function closeModal() {
     // 重設回第一個預設色
     selectedPaletteItem = fixedPalette[0]; 
     
+    newTaskDateInput.disabled = false;
+    delete newTaskDateInput.dataset.userEdited;
+
     toggleTaskTypeView();
     toggleCategoryInput();
     
@@ -298,12 +306,26 @@ taskModal.addEventListener('click', (e) => {
 });
 
 function toggleTaskTypeView() {
-    if (taskTypeSelect.value === 'temporary') {
+    const isTemp = (taskTypeSelect.value === 'temporary');
+
+    if (isTemp) {
         newTaskDateInput.classList.remove('hidden');
+        // 預設自動帶入今天日期（使用者自己改過就不再覆蓋掉）
+        if (!newTaskDateInput.disabled && !newTaskDateInput.dataset.userEdited) {
+            newTaskDateInput.value = getTodayDateStr2026();
+        }
     } else {
         newTaskDateInput.classList.add('hidden');
     }
+
+    // 臨時任務不用選大類別、不用填次數，這兩欄直接整個隱藏
+    const categoryRowEl = document.getElementById('category-select-row');
+    if (categoryRowEl) categoryRowEl.classList.toggle('hidden', isTemp);
+    newTaskTotalInput.classList.toggle('hidden', isTemp);
+
+    toggleColorPickerVisibility();
 }
+newTaskDateInput.addEventListener('input', () => { newTaskDateInput.dataset.userEdited = 'true'; });
 taskTypeSelect.addEventListener('change', toggleTaskTypeView);
 
 function updateCategorySelectOptions() {
@@ -594,7 +616,7 @@ function renderTempTaskList() {
     const tasks = getTempTasksForWeek(currentWeek);
 
     if (tasks.length === 0) {
-        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">本週尚無臨時任務，點「新增項目」並選擇「按特定日期臨時任務」即可加入。</li>`;
+        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">本週尚無臨時任務，點「新增項目」並選擇「按特定日期臨時任務」即可加入，不用選分類也不用填次數。</li>`;
         return;
     }
 
@@ -606,18 +628,18 @@ function renderTempTaskList() {
 
         li.innerHTML = `
             <div class="todo-item-clickable-area">
-                <span class="todo-item-progress-tag" style="background:#ffedd5; color:#9a3412;">${task.category || '臨時任務'}</span>
+                <span class="todo-item-progress-tag">${task.date || ''}</span>
                 <b>${task.name}</b>
             </div>
-            <span class="sub-counter">
-                <button class="counter-btn minus-btn">-</button>
-                <span>${task.completed} / ${task.total}</span>
-                <button class="counter-btn plus-btn">+</button>
+            <span class="sub-counter temp-complete-wrap">
+                <label class="temp-complete-label">
+                    <input type="checkbox" class="temp-complete-checkbox">
+                    完成
+                </label>
             </span>
             <span class="actions">
                 <button class="move-btn move-up-btn" title="往上移" ${index === 0 ? 'disabled' : ''}>▲</button>
                 <button class="move-btn move-down-btn" title="往下移" ${index === tasks.length - 1 ? 'disabled' : ''}>▼</button>
-                <button class="archive-btn">完成</button>
                 <button class="edit-btn">編輯</button>
                 <button class="delete-btn">刪除</button>
             </span>
@@ -636,23 +658,14 @@ function renderTempTaskList() {
             }
         });
 
-        li.querySelector('.plus-btn').addEventListener('click', () => {
-            if (task.completed < task.total) {
-                task.completed++;
-                syncTempTaskCounter(task.id, 1);
-                updateView();
+        // 勾選「完成」：直接完結並移入歷史紀錄，之後可以在歷史紀錄裡隨時加回來
+        li.querySelector('.temp-complete-checkbox').addEventListener('change', (e) => {
+            if (!e.target.checked) return;
+            if (!confirm(`確定「${task.name}」已經完成了嗎？完成後會移到歷史紀錄，之後可以隨時從歷史紀錄加回來。`)) {
+                e.target.checked = false;
+                return;
             }
-        });
-        li.querySelector('.minus-btn').addEventListener('click', () => {
-            if (task.completed > 0) {
-                task.completed--;
-                syncTempTaskCounter(task.id, -1);
-                updateView();
-            }
-        });
-
-        li.querySelector('.archive-btn').addEventListener('click', () => {
-            if (!confirm("確定將此臨時任務標記為完結並在列表上隱藏嗎？")) return;
+            task.completed = 1;
             task.archived = true;
             saveTempTasksTree();
             updateView();
@@ -671,19 +684,10 @@ function renderTempTaskList() {
             newTaskDateInput.disabled = true;
 
             newTaskNameInput.value = task.name;
-            newTaskTotalInput.value = task.total;
-
-            if (task.customHue !== undefined) {
-                const foundColor = fixedPalette.find(p => p.hue === task.customHue);
-                if (foundColor) selectedPaletteItem = foundColor;
-            } else {
-                selectedPaletteItem = fixedPalette[0];
-            }
-            renderColorPalette();
         });
 
         li.querySelector('.delete-btn').addEventListener('click', () => {
-            if (confirm("確定要刪除此臨時任務嗎？")) {
+            if (confirm("確定要刪除此臨時任務嗎？（這會直接刪除，不會進入歷史紀錄）")) {
                 globalAppData.tempTasks = deleteTempTaskFilter(task.id);
                 saveTempTasksTree();
                 updateView();
@@ -691,6 +695,73 @@ function renderTempTaskList() {
         });
 
         container.appendChild(li);
+    });
+}
+
+// ================= 臨時任務歷史紀錄（已完成的） =================
+function getArchivedTempTasks() {
+    return (globalAppData.tempTasks || [])
+        .filter(t => t.archived)
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+function renderTempHistoryList() {
+    const historyList = document.getElementById('temp-history-list');
+    if (!historyList) return;
+    historyList.innerHTML = '';
+
+    const archivedTasks = getArchivedTempTasks();
+    if (archivedTasks.length === 0) {
+        historyList.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">目前沒有已完成的臨時任務紀錄。</li>`;
+        return;
+    }
+
+    archivedTasks.forEach(task => {
+        const li = document.createElement('li');
+        li.className = 'todo-item';
+        li.style.cursor = 'default';
+        li.style.borderLeft = `5px solid ${task.color || '#94a3b8'}`;
+
+        li.innerHTML = `
+            <div class="todo-item-clickable-area">
+                <span class="todo-item-progress-tag">${task.date || ''}</span>
+                <b>${task.name}</b>
+            </div>
+            <span class="history-actions">
+                <button class="edit-btn restore-btn">加回來</button>
+            </span>
+        `;
+
+        li.querySelector('.restore-btn').addEventListener('click', () => {
+            task.archived = false;
+            task.completed = 0;
+            saveTempTasksTree();
+            renderTempHistoryList();
+            updateView();
+        });
+
+        historyList.appendChild(li);
+    });
+}
+
+const openTempHistoryBtn = document.getElementById('open-temp-history-btn');
+const tempHistoryModal = document.getElementById('temp-history-modal');
+const closeTempHistoryModalBtn = document.getElementById('close-temp-history-modal-btn');
+
+if (openTempHistoryBtn) {
+    openTempHistoryBtn.addEventListener('click', () => {
+        renderTempHistoryList();
+        if (tempHistoryModal) tempHistoryModal.classList.remove('hidden');
+    });
+}
+if (closeTempHistoryModalBtn) {
+    closeTempHistoryModalBtn.addEventListener('click', () => {
+        if (tempHistoryModal) tempHistoryModal.classList.add('hidden');
+    });
+}
+if (tempHistoryModal) {
+    tempHistoryModal.addEventListener('click', (e) => {
+        if (e.target === tempHistoryModal) tempHistoryModal.classList.add('hidden');
     });
 }
 
@@ -797,11 +868,6 @@ addTaskBtn.addEventListener('click', () => {
                 const task = globalAppData.tempTasks.find(t => t.id === subItem.tempId);
                 if (task) {
                     task.name = newName;
-                    task.total = newTotal;
-                    if (confirm("是否將此臨時任務套用目前選擇的顏色？")) {
-                        task.color = chosenColor;
-                        task.customHue = chosenHue;
-                    }
                 }
                 saveTempTasksTree();
             } else {
@@ -832,28 +898,52 @@ addTaskBtn.addEventListener('click', () => {
         return;
     }
 
-    let targetCategory = categorySelect.value;
-    const wasNewCategory = (targetCategory === '__new__');
     const taskName = newTaskNameInput.value.trim();
-    const taskTotal = parseInt(newTaskTotalInput.value, 10) || 1;
-
     if (!taskName) { alert("請輸入任務名稱！"); return; }
 
     const isTemporary = (taskTypeSelect.value === 'temporary');
+
+    // ===== 臨時任務：不用選分類、不用填次數，日期預設今天，新項目排在清單最上面 =====
+    if (isTemporary) {
+        const selectedDate = newTaskDateInput.value;
+        if (!selectedDate) { alert("請選擇日期！"); return; }
+
+        const computedWeek = getWeekNumberByDate(selectedDate);
+        if (!computedWeek) { alert("選擇的日期超出範圍！"); return; }
+
+        const weekTasks = getTempTasksForWeek(computedWeek);
+        const minOrder = weekTasks.length > 0 ? Math.min(...weekTasks.map(t => t.order || 0)) : 0;
+
+        globalAppData.tempTasks.push({
+            id: Date.now(),
+            date: selectedDate,
+            category: '臨時任務',
+            name: taskName,
+            total: 1,
+            completed: 0,
+            color: '#94a3b8',
+            order: minOrder - 1 // 排在最上面
+        });
+        saveTempTasksTree();
+        closeModal();
+        updateView();
+        return;
+    }
+
+    // ===== 常規任務：維持原本要選分類的流程 =====
+    let targetCategory = categorySelect.value;
+    const wasNewCategory = (targetCategory === '__new__');
+    const taskTotal = parseInt(newTaskTotalInput.value, 10) || 1;
 
     if (targetCategory === '__new__') {
         const catName = newCategoryInput.value.trim();
         if (!catName) { alert("請輸入新大類別的名稱！"); return; }
         
-        if (isTemporary) {
-            targetCategory = catName;
-        } else {
-            if (!globalAppData.template[catName]) {
-                const existingCategoryCount = Object.keys(globalAppData.template).length;
-                globalAppData.template[catName] = { subItems: {}, customHue: selectedPaletteItem.hue, order: existingCategoryCount };
-            }
-            targetCategory = catName;
+        if (!globalAppData.template[catName]) {
+            const existingCategoryCount = Object.keys(globalAppData.template).length;
+            globalAppData.template[catName] = { subItems: {}, customHue: selectedPaletteItem.hue, order: existingCategoryCount };
         }
+        targetCategory = catName;
     }
 
     // 幫既有分類新增子項目時（不是新建大類別），顏色直接沿用該分類本身的顏色，
@@ -867,32 +957,9 @@ addTaskBtn.addEventListener('click', () => {
         }
     }
 
-    if (isTemporary) {
-        const selectedDate = newTaskDateInput.value;
-        if (!selectedDate) { alert("請選擇日期！"); return; }
-        
-        const computedWeek = getWeekNumberByDate(selectedDate);
-        if (!computedWeek) { alert("選擇的日期超出範圍！"); return; }
-
-        const sameWeekCount = getTempTasksForWeek(computedWeek).length;
-        globalAppData.tempTasks.push({
-            id: Date.now(),
-            date: selectedDate,
-            category: targetCategory,
-            name: taskName,
-            total: taskTotal,
-            completed: 0,
-            color: chosenColor,
-            customHue: chosenHue,
-            order: sameWeekCount
-        });
-        saveTempTasksTree();
-        alert(`新增成功！臨時任務已排入：${computedWeek}`);
-    } else {
-        const existingSubCount = Object.keys(globalAppData.template[targetCategory].subItems).length;
-        globalAppData.template[targetCategory].subItems[taskName] = { total: taskTotal, customHue: chosenHue, order: existingSubCount };
-        saveTemplate();
-    }
+    const existingSubCount = Object.keys(globalAppData.template[targetCategory].subItems).length;
+    globalAppData.template[targetCategory].subItems[taskName] = { total: taskTotal, customHue: chosenHue, order: existingSubCount };
+    saveTemplate();
 
     closeModal();
     updateView();
@@ -903,8 +970,66 @@ backBtn.addEventListener('click', () => {
     currentView = 'main'; currentSubKey = null; resetChartInstance(); updateView();
 });
 
-weekSelect.addEventListener('change', (e) => {
+// ================= 表格式週次選擇器 =================
+function updateWeekPickerLabel() {
+    if (weekPickerCurrentLabel) weekPickerCurrentLabel.innerText = currentWeek.replace(/[^0-9]/g, '');
+}
+
+function renderWeekPickerGrid() {
+    if (!weekPickerGrid) return;
+    weekPickerGrid.innerHTML = '';
+    const todayWeekKey = getTodayWeekKey();
+
+    for (let w = 1; w <= 53; w++) {
+        const weekKeyStr = `第 ${w} 週`;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'week-picker-cell';
+        btn.innerText = w;
+        if (weekKeyStr === currentWeek) btn.classList.add('is-selected');
+        if (weekKeyStr === todayWeekKey) btn.classList.add('is-today');
+        btn.addEventListener('click', () => selectWeek(weekKeyStr));
+        weekPickerGrid.appendChild(btn);
+    }
+}
+
+function selectWeek(weekKeyStr) {
     todoListWrapper.classList.remove('editing-mode');
-    currentWeek = e.target.value; currentView = 'main'; currentSubKey = null; resetChartInstance(); updateView();
+    const tempListWrapperForWeek = document.getElementById('temp-task-list-wrapper');
+    if (tempListWrapperForWeek) tempListWrapperForWeek.classList.remove('editing-mode');
+
+    currentWeek = weekKeyStr;
+    currentView = 'main'; currentSubKey = null;
+    resetChartInstance();
+    updateWeekPickerLabel();
+    closeWeekPicker();
+    updateView();
+}
+
+function openWeekPicker() {
+    renderWeekPickerGrid();
+    if (weekPickerPanel) weekPickerPanel.classList.remove('hidden');
+}
+
+function closeWeekPicker() {
+    if (weekPickerPanel) weekPickerPanel.classList.add('hidden');
+}
+
+if (weekPickerToggleBtn) {
+    weekPickerToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (weekPickerPanel && weekPickerPanel.classList.contains('hidden')) {
+            openWeekPicker();
+        } else {
+            closeWeekPicker();
+        }
+    });
+}
+
+// 點擊選單以外的地方就自動收起
+document.addEventListener('click', (e) => {
+    if (!weekPickerPanel || weekPickerPanel.classList.contains('hidden')) return;
+    if (weekPickerPanel.contains(e.target) || e.target === weekPickerToggleBtn) return;
+    closeWeekPicker();
 });
 

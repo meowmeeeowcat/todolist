@@ -50,7 +50,12 @@
     <div id="view-todo" class="container">
         <div class="control-panel">
             <div>
-                <select id="week-select"></select>
+                <div class="week-picker">
+                    <button id="week-picker-toggle-btn" type="button" class="week-picker-toggle">第 <span id="week-picker-current-label">1</span> 週 ▾</button>
+                    <div id="week-picker-panel" class="week-picker-panel hidden">
+                        <div id="week-picker-grid" class="week-picker-grid"></div>
+                    </div>
+                </div>
                 <button id="view-calendar-btn" onclick="switchPage('calendar')" disabled title="資料載入中...">查看年度年曆總覽</button>
             </div>
             <div>
@@ -87,6 +92,7 @@
             <div id="temp-task-list-wrapper" class="todo-list-wrapper temp-task-list-wrapper mobile-tab-hidden">
                 <div class="list-header">
                     <h3>臨時待辦</h3>
+                    <button id="open-temp-history-btn" style="padding: 6px 12px; font-size: 13px; background-color: #64748b;">歷史紀錄</button>
                 </div>
                 <ul id="temp-task-list"></ul>
             </div>
@@ -145,7 +151,7 @@
                     <input type="date" id="new-task-date" class="hidden" value="2026-01-01">
                 </div>
 
-                <div class="form-row">
+                <div id="category-select-row" class="form-row">
                     <select id="task-category-select">
                         <option value="__new__">新增全新大類別</option>
                     </select>
@@ -165,6 +171,17 @@
                     <button id="add-task-btn">確認儲存</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ================= 臨時任務歷史紀錄（已完成的） ================= -->
+    <div id="temp-history-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4>臨時任務歷史紀錄</h4>
+                <button class="close-modal-btn" id="close-temp-history-modal-btn">&times;</button>
+            </div>
+            <ul id="temp-history-list" style="list-style:none; padding:0; margin:0; max-height:55vh; overflow-y:auto;"></ul>
         </div>
     </div>
 
