@@ -203,6 +203,10 @@ let currentWeek = "第 1 週";
 let currentView = 'main'; 
 let currentSubKey = null;
 let editingContext = null;
+// 加權比例頁是從哪個頁面點進來的：'main'（主頁，所有大類別）或 'sub'（某個大類別的分項頁）
+// 離開加權比例頁（返回）時要回到原本那一頁，而不是永遠回主頁
+let weightViewSourceView = 'main';
+let weightViewSourceSubKey = null;
 let fullWeekData = {}; // 尚未過濾臨時任務的完整週資料，給「新增任務」下拉選單、顏色繼承用
 
 // 動態渲染 10 色選擇按鈕
@@ -309,6 +313,11 @@ openEditModalBtn.addEventListener('click', () => {
 
 openWeightViewBtn.addEventListener('click', () => {
     todoListWrapper.classList.remove('editing-mode');
+    // 記住目前是從主頁還是分項頁點進來的，這樣加權比例頁才知道要顯示所有大類別、還是只顯示這個大類別底下的分項
+    if (currentView !== 'weight') {
+        weightViewSourceView = currentView;
+        weightViewSourceSubKey = currentSubKey;
+    }
     currentView = 'weight';
     resetChartInstance();
     updateView();
@@ -861,6 +870,19 @@ function getFullCompletionChartData(weekData) {
     return getChartData(fakeData, false);
 }
 
+// 分項版的加權比例調整頁專用：邏輯同上，但只針對「某一個大類別底下的分項」，
+// 這樣使用者在分項頁點加權比例時，看到的圓餅圖跟可調整的清單都只會是這個大類別的分項，不會混進其他大類別。
+function getFullCompletionChartDataForSub(subItems, categoryKey) {
+    const fakeData = {};
+    for (let subKey in subItems) {
+        const item = subItems[subKey];
+        const weight = getSubItemWeight(categoryKey, subKey);
+        const weightedTotal = (item.total || 0) * weight;
+        fakeData[subKey] = { ...item, completed: weightedTotal, total: weightedTotal };
+    }
+    return getChartData(fakeData, true);
+}
+
 // 加權比例調整頁：輸入數字當下只重畫圓餅圖預覽（不重繪整份清單，避免每打一個字輸入框就失焦），
 // 離開該欄位（change事件，通常是切到下一格或點掉）時才真正存進 Firebase。
 function refreshWeightChartPreview() {
@@ -868,6 +890,15 @@ function refreshWeightChartPreview() {
     const weekData = getRegularOnlyWeekData(weeklyDataStore[currentWeek]);
     const fullChartData = getFullCompletionChartData(weekData);
     renderPieChart('todoChart', fullChartData, null);
+}
+
+// 分項版的加權比例調整頁：同上，但只重畫「某個大類別底下分項」的圓餅圖預覽
+function refreshSubWeightChartPreview(categoryKey) {
+    calculateMainItems(currentWeek);
+    const weekData = getRegularOnlyWeekData(weeklyDataStore[currentWeek]);
+    const subItems = weekData[categoryKey] ? weekData[categoryKey].subItems : {};
+    const fullSubChartData = getFullCompletionChartDataForSub(subItems, categoryKey);
+    renderPieChart('todoChart', fullSubChartData, null);
 }
 
 // 渲染「加權比例」調整頁：列出所有大類別跟底下的分項，各自可以填一個倍數
@@ -934,6 +965,42 @@ function renderWeightEditor(weekData) {
     });
 }
 
+// 渲染「分項版加權比例」調整頁：只列出某一個大類別底下的分項，不顯示大類別本身、也不顯示其他大類別
+function renderSubWeightEditor(categoryKey, subItems) {
+    listContainer.innerHTML = '';
+    const orderedSubKeys = sortKeysByOrder(subItems);
+
+    if (orderedSubKeys.length === 0) {
+        listContainer.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">這個大類別底下目前沒有分項可以調整加權比例。</li>`;
+        return;
+    }
+
+    orderedSubKeys.forEach(subKey => {
+        const subItem = subItems[subKey];
+        const subLi = document.createElement('li');
+        subLi.className = 'todo-item weight-editor-row';
+        subLi.style.cursor = 'default';
+        subLi.style.borderLeft = `5px solid ${subItem.color}`;
+        subLi.innerHTML = `
+            <div class="todo-item-clickable-area"><b>${subKey}</b></div>
+            <span class="weight-input-wrap">
+                倍數
+                <input type="number" class="weight-input" min="0.1" step="0.1" value="${getSubItemWeight(categoryKey, subKey)}">
+            </span>
+        `;
+        const subInput = subLi.querySelector('.weight-input');
+        subInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (globalAppData.template[categoryKey] && globalAppData.template[categoryKey].subItems[subKey]) {
+                globalAppData.template[categoryKey].subItems[subKey].weight = (!isNaN(val) && val > 0) ? val : 1;
+                refreshSubWeightChartPreview(categoryKey);
+            }
+        });
+        subInput.addEventListener('change', () => saveTemplate());
+        listContainer.appendChild(subLi);
+    });
+}
+
 function updateView() {
     calculateMainItems(currentWeek);
     fullWeekData = weeklyDataStore[currentWeek];
@@ -942,12 +1009,21 @@ function updateView() {
     if (currentView === 'weight') {
         // 加權比例調整頁：圓餅圖顯示「全部當作已完成」的樣子（沒有灰色未完成區塊），
         // 這樣使用者可以直接看出調整倍數後、各項目在圖上實際佔的比例。
-        titleEl.innerText = "加權比例調整";
+        // 根據是從哪個頁面點進來的做拆分：主頁點進來 → 顯示所有大類別；分項頁點進來 → 只顯示該大類別底下的分項。
         backBtn.classList.remove('hidden');
 
-        const fullChartData = getFullCompletionChartData(weekData);
-        renderPieChart('todoChart', fullChartData, null);
-        renderWeightEditor(weekData);
+        if (weightViewSourceView === 'sub' && weightViewSourceSubKey) {
+            titleEl.innerText = weightViewSourceSubKey + " - 分項加權比例調整";
+            const subItems = weekData[weightViewSourceSubKey] ? weekData[weightViewSourceSubKey].subItems : {};
+            const fullSubChartData = getFullCompletionChartDataForSub(subItems, weightViewSourceSubKey);
+            renderPieChart('todoChart', fullSubChartData, null);
+            renderSubWeightEditor(weightViewSourceSubKey, subItems);
+        } else {
+            titleEl.innerText = "加權比例調整";
+            const fullChartData = getFullCompletionChartData(weekData);
+            renderPieChart('todoChart', fullChartData, null);
+            renderWeightEditor(weekData);
+        }
     } else if (currentView === 'main') {
         titleEl.innerText = currentWeek + " - 必做事項總覽";
         backBtn.classList.add('hidden');
@@ -1126,7 +1202,16 @@ addTaskBtn.addEventListener('click', () => {
 
 backBtn.addEventListener('click', () => {
     todoListWrapper.classList.remove('editing-mode');
-    currentView = 'main'; currentSubKey = null; resetChartInstance(); updateView();
+    if (currentView === 'weight') {
+        // 從加權比例頁返回：回到原本點進來的那一頁（主頁或某個大類別的分項頁）
+        currentView = weightViewSourceView;
+        currentSubKey = (weightViewSourceView === 'sub') ? weightViewSourceSubKey : null;
+    } else {
+        currentView = 'main';
+        currentSubKey = null;
+    }
+    resetChartInstance();
+    updateView();
 });
 
 // ================= 表格式週次選擇器 =================

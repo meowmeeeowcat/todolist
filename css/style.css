@@ -111,6 +111,40 @@ select:focus, input:focus {
     box-shadow: 0 0 0 2px rgba(75, 192, 192, 0.2);
 }
 
+/* ================= 分頁切換按鈕（Tab）通用樣式 =================
+   套用在所有「一組按鈕互相切換」的地方，例如年曆頁的「12個月傳統年曆／53週視圖」、
+   手機版的「項目清單／代辦清單」等。未選取時是淡色，選取中（.active）才變成主色，
+   這樣才看得出目前選到哪一個，不會跟一般按鈕混在一起。 */
+.control-actions-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tab-btn {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    padding: 9px 16px;
+    font-size: 14px;
+}
+
+.tab-btn:hover {
+    background-color: #e2e8f0;
+}
+
+.tab-btn.active {
+    background-color: #4bc0c0;
+    color: white;
+    border-color: #4bc0c0;
+}
+
+.tab-btn.active:hover {
+    background-color: #36a2eb;
+    border-color: #36a2eb;
+}
+
 .main-content {
     display: flex;
     justify-content: space-between;
@@ -159,7 +193,19 @@ select:focus, input:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    row-gap: 10px;
     margin-bottom: 15px;
+}
+
+/* 標題旁邊那一排按鈕（新增項目／加權比例／編輯模式）：
+   這個欄位本身不寬（桌面版被左邊圖表跟旁邊的臨時待辦清單擠壓），三顆按鈕原本沒有 flex-wrap，
+   放不下時就會被硬擠在一起、跑版。改成 flex + wrap + gap 後，放不下就自動換行，不會再擠壓變形。 */
+.list-header > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
 }
 
 .list-header h3 {
