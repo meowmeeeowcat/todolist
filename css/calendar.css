@@ -7,27 +7,11 @@
 }
 
 .calendar-top-dashboard {
-    display: flex;
-    gap: 20px;
-    align-items: stretch;
     margin-top: 15px;
     margin-bottom: 20px;
 }
 
-.control-actions-box {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    justify-content: center;
-    min-width: 200px;
-    background: #f8fafc;
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
 .summary-stats-section {
-    flex: 1;
     background: white;
     padding: 15px 20px;
     border-radius: 12px;
@@ -134,70 +118,97 @@
 
 #nav-back-btn:hover { background: #475569; }
 
-.tab-btn {
-    padding: 12px 14px;
-    border: none;
-    background: #e2e8f0;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: all 0.2s;
-    font-size: 15px;
-    text-align: left;
-    color: #475569;
+/* ================= 月曆導覽列：上一頁／目前月份／下一頁 + 年度總覽按鈕 ================= */
+.month-nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 10px;
+    margin-bottom: 18px;
 }
 
-.tab-btn.active {
+.month-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.month-nav-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.month-nav-btn:hover {
+    background: #cbd5e1;
+}
+
+.current-month-label {
+    font-size: 20px;
+    font-weight: bold;
+    color: #1a4d6c;
+    min-width: 64px;
+    text-align: center;
+}
+
+.annual-overview-btn {
     background: #4bc0c0;
     color: white;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
 }
 
-.months-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 15px;
+.annual-overview-btn:hover {
+    background: #36a2eb;
 }
 
-.weeks-53-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-    gap: 10px;
+/* ================= 單一月份月曆（一次只顯示當月）================= */
+.single-month-grid {
+    display: flex;
+    justify-content: center;
 }
 
-.month-card {
+.month-card.single-month-card {
+    width: 100%;
+    max-width: 480px;
     border: 1px solid #eef2f5;
-    padding: 12px;
+    padding: 16px;
     border-radius: 8px;
     background: #fafafa;
-}
-
-.month-title {
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 10px;
-    color: #1a4d6c;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 6px;
-    font-size: 16px;
 }
 
 .days-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
+    gap: 8px;
     text-align: center;
-    font-size: 13px;
+    font-size: 15px;
 }
 
-.day-cell, .week-box-btn {
-    padding: 6px 0;
-    border-radius: 4px;
+.day-cell {
+    padding: 10px 0;
+    border-radius: 6px;
     cursor: pointer;
     transition: transform 0.1s;
 }
 
-.day-cell:hover, .week-box-btn:hover {
-    transform: scale(1.15);
+.day-cell:hover {
+    transform: scale(1.12);
     z-index: 2;
     box-shadow: 0 2px 6px rgba(54, 162, 235, 0.2);
 }
@@ -211,7 +222,7 @@
 .rate-high { background-color: #4bc0c0; color: white; }
 
 .day-cell.is-today { outline: 2px dashed #ff5722; font-weight: bold; }
-.day-cell.is-selected, .week-box-btn.is-selected {
+.day-cell.is-selected {
     outline: 2px solid #36a2eb !important;
     font-weight: bold;
     background-color: #e0f2fe !important;
@@ -230,33 +241,42 @@
 .regular-progress-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
 .no-data-hint { color: #94a3b8; font-style: italic; font-size: 14px; }
 
+/* ================= 年度總覽彈窗：4x3 排列 12 個月，不可互動，只顯示達成率 ================= */
+.annual-overview-content {
+    width: 560px;
+    max-width: 92vw;
+}
+
+.annual-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.annual-overview-cell {
+    padding: 18px 8px;
+    border-radius: 10px;
+    text-align: center;
+    cursor: default;
+}
+
+.annual-overview-month-name {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.annual-overview-rate {
+    font-size: 20px;
+    font-weight: bold;
+}
+
 /* ================= RWD：手機版（寬度 768px 以下）================= */
 @media (max-width: 768px) {
     .calendar-main-container {
         width: 100%;
         max-width: 100%;
-    }
-
-    .calendar-top-dashboard {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .control-actions-box {
-        flex-direction: row;
-        flex-wrap: wrap;
-        min-width: 0;
-        width: 100%;
-        box-sizing: border-box;
-        padding: 10px;
-        gap: 8px;
-    }
-
-    .tab-btn {
-        flex: 1 1 45%;
-        text-align: center;
-        font-size: 13px;
-        padding: 10px 8px;
     }
 
     .summary-stats-section {
@@ -288,49 +308,56 @@
         padding: 12px;
     }
 
-    /* 兩欄月曆卡片，卡片內距與格線間距都收窄，讓每格日期盡量留大 */
-    .months-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
+    .month-nav-header {
+        justify-content: center;
     }
 
-    .month-card {
-        padding: 6px;
+    .month-nav-controls {
+        order: 1;
+    }
+
+    .annual-overview-btn {
+        order: 2;
+        width: 100%;
+    }
+
+    .month-card.single-month-card {
+        padding: 10px;
     }
 
     .days-grid {
-        gap: 3px;
-        font-size: 12px;
+        gap: 5px;
+        font-size: 13px;
     }
 
-    .weeks-53-grid {
-        grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+    .day-cell {
+        font-size: 13px;
+        padding: 8px 0;
     }
 
-    .day-cell, .week-box-btn {
-        font-size: 12px;
-        padding: 5px 0;
+    .annual-overview-grid {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(4, 1fr);
     }
 }
 
 /* ================= RWD：小尺寸手機（寬度 480px 以下）================= */
 @media (max-width: 480px) {
-    /* 螢幕太窄時兩欄會讓每格日期小於 20px、難以點按，
-       改成一次只看一個月、佔滿整行寬度，格子自然變大許多。 */
-    .months-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .month-card {
-        padding: 10px;
+    .month-card.single-month-card {
+        padding: 8px;
     }
 
     .days-grid {
         gap: 4px;
-        font-size: 13px;
+        font-size: 12px;
     }
 
-    .tab-btn {
-        flex: 1 1 100%;
+    .day-cell {
+        padding: 6px 0;
+    }
+
+    .annual-overview-grid {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(6, 1fr);
     }
 }

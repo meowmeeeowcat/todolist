@@ -164,6 +164,9 @@ select:focus, input:focus {
     color: #1a4d6c;
     margin-bottom: 15px;
     font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .chart-wrapper {
@@ -217,13 +220,20 @@ select:focus, input:focus {
     gap: 8px;
 }
 
-.back-inline-btn {
+.back-icon-btn {
     background-color: #64748b;
-    padding: 5px 10px;
-    font-size: 13px;
-    border-radius: 6px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
-.back-inline-btn:hover {
+.back-icon-btn:hover {
     background-color: #475569;
 }
 
@@ -696,6 +706,7 @@ button:hover {
     #chart-title {
         font-size: 22px;
         text-align: center;
+        justify-content: center;
     }
 
     .todo-item {

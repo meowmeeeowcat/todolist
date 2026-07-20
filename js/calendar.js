@@ -4,19 +4,13 @@
 const monthNames = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
 const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
 
-let currentActiveView = 'months'; 
 let selectedDateStr = "";
-
+// 目前月曆頁顯示的月份（0 = 一月 ... 11 = 十二月），一次只顯示一個月，用上一頁/下一頁切換
+let currentMonthIndex = 0;
+// 記住「今天」的日期字串，切換月份重畫時要用它來標示 is-today
+let cachedTodayStr = "";
 
 // getWeekNumberFor2026 / formatDateString 已搬到共用檔案 js/date-utils.js（html 需先載入它）
-
-function switchView(viewType) {
-    currentActiveView = viewType;
-    document.getElementById('tab-months').classList.toggle('active', viewType === 'months');
-    document.getElementById('tab-weeks').classList.toggle('active', viewType === 'weeks');
-    document.getElementById('months-view-container').classList.toggle('hidden', viewType !== 'months');
-    document.getElementById('weeks-view-container').classList.toggle('hidden', viewType !== 'weeks');
-}
 
 function getSafeMacaronColor(groupName, fallbackColor) {
     if (groupName === '臨時任務') return '#94a3b8';
@@ -27,48 +21,72 @@ function getSafeMacaronColor(groupName, fallbackColor) {
     return fallbackColor || '#bae1ff';
 }
 
-function renderMonthsCalendar(todayStr) {
+// 計算「2026-01-01」到某個月份第 1 天之間，累積了幾天，藉此推算出該月 1 號是星期幾
+// （週一為索引 0 ...週日為索引 6；2026-01-01 是週四，索引為 3）
+function getMonthStartWeekdayIndex(monthIndex) {
+    let totalDaysBefore = 0;
+    for (let i = 0; i < monthIndex; i++) totalDaysBefore += daysInMonths[i];
+    return (3 + totalDaysBefore) % 7;
+}
+
+function rateToClass(rate) {
+    if (rate === 1) return 'rate-high';
+    if (rate >= 0.5) return 'rate-mid';
+    if (rate > 0) return 'rate-low';
+    return 'rate-zero';
+}
+
+// 單一月份的整體達成率：把該月每一天所屬週次的達成率平均起來（簡化計算，不特別切分「屬於這個月的天數比例」）
+function getMonthCompletionRate(monthIndex) {
+    const days = daysInMonths[monthIndex];
+    let sum = 0, count = 0;
+    for (let d = 1; d <= days; d++) {
+        const weekNum = getWeekNumberFor2026(monthIndex, d);
+        const rate = getWeekCompletionRate(`第 ${weekNum} 週`);
+        sum += rate;
+        count++;
+    }
+    return count > 0 ? (sum / count) : 0;
+}
+
+// 畫出「目前這個月」的月曆格子（一次只會顯示一個月）
+function renderMonthsCalendar(monthIndex, todayStr) {
     const container = document.getElementById('months-view-container');
     if (!container) return;
     container.innerHTML = '';
-    let currentFirstDayOfWeek = 3; // 2026-01-01 是週四，週一起始的陣列中索引為 3（一=0,二=1,三=2,四=3）
 
-    for (let m = 0; m < 12; m++) {
-        const monthCard = document.createElement('div');
-        monthCard.className = 'month-card';
-        
-        let html = `<div class="month-title">${monthNames[m]}</div>`;
-        html += `<div class="days-grid">`;
-        weekdays.forEach(d => html += `<div class="weekday-label">${d}</div>`);
-        
-        for (let e = 0; e < currentFirstDayOfWeek; e++) html += `<div class="empty-cell"></div>`;
+    const monthLabelEl = document.getElementById('current-month-label');
+    if (monthLabelEl) monthLabelEl.innerText = monthNames[monthIndex];
 
-        const days = daysInMonths[m];
-        for (let d = 1; d <= days; d++) {
-            const weekNum = getWeekNumberFor2026(m, d);
-            const dateStr = formatDateString(m, d);
-            const rate = getWeekCompletionRate(`第 ${weekNum} 週`);
-            
-            let rateClass = 'rate-zero';
-            if (rate === 1) rateClass = 'rate-high';
-            else if (rate >= 0.5) rateClass = 'rate-mid';
-            else if (rate > 0) rateClass = 'rate-low';
+    const monthCard = document.createElement('div');
+    monthCard.className = 'month-card single-month-card';
 
-            const isToday = (dateStr === todayStr) ? 'is-today' : '';
-            const isSelected = (dateStr === selectedDateStr) ? 'is-selected' : '';
+    let html = `<div class="days-grid">`;
+    weekdays.forEach(d => html += `<div class="weekday-label">${d}</div>`);
 
-            html += `
-                <div class="day-cell ${rateClass} ${isToday} ${isSelected}" 
-                     data-date="${dateStr}" data-week="第 ${weekNum} 週">
-                    ${d}
-                </div>
-            `;
-        }
-        html += `</div>`;
-        monthCard.innerHTML = html;
-        container.appendChild(monthCard);
-        currentFirstDayOfWeek = (currentFirstDayOfWeek + days) % 7;
+    const startWeekdayIdx = getMonthStartWeekdayIndex(monthIndex);
+    for (let e = 0; e < startWeekdayIdx; e++) html += `<div class="empty-cell"></div>`;
+
+    const days = daysInMonths[monthIndex];
+    for (let d = 1; d <= days; d++) {
+        const weekNum = getWeekNumberFor2026(monthIndex, d);
+        const dateStr = formatDateString(monthIndex, d);
+        const rate = getWeekCompletionRate(`第 ${weekNum} 週`);
+        const rateClass = rateToClass(rate);
+
+        const isToday = (dateStr === todayStr) ? 'is-today' : '';
+        const isSelected = (dateStr === selectedDateStr) ? 'is-selected' : '';
+
+        html += `
+            <div class="day-cell ${rateClass} ${isToday} ${isSelected}" 
+                 data-date="${dateStr}" data-week="第 ${weekNum} 週">
+                ${d}
+            </div>
+        `;
     }
+    html += `</div>`;
+    monthCard.innerHTML = html;
+    container.appendChild(monthCard);
 
     container.querySelectorAll('.day-cell').forEach(cell => {
         cell.addEventListener('click', () => {
@@ -80,33 +98,46 @@ function renderMonthsCalendar(todayStr) {
     });
 }
 
-function renderWeeksCalendar() {
-    const container = document.getElementById('weeks-view-container');
-    if (!container) return;
-    container.innerHTML = '';
+function goToPrevMonth() {
+    currentMonthIndex = (currentMonthIndex + 11) % 12;
+    renderMonthsCalendar(currentMonthIndex, cachedTodayStr);
+}
 
-    for (let w = 1; w <= 53; w++) {
-        const weekKey = `第 ${w} 週`;
-        const rate = getWeekCompletionRate(weekKey);
-        
-        let rateClass = 'rate-zero';
-        if (rate === 1) rateClass = 'rate-high';
-        else if (rate >= 0.5) rateClass = 'rate-mid';
-        else if (rate > 0) rateClass = 'rate-low';
+function goToNextMonth() {
+    currentMonthIndex = (currentMonthIndex + 1) % 12;
+    renderMonthsCalendar(currentMonthIndex, cachedTodayStr);
+}
 
-        const weekCard = document.createElement('div');
-        weekCard.className = `week-box-btn ${rateClass}`;
-        weekCard.setAttribute('data-week', weekKey);
-        weekCard.innerText = `W${w}`;
+// 年度總覽彈窗：4x3 排列 12 個月，只顯示每個月的達成率，不可點擊互動
+function renderAnnualOverviewGrid() {
+    const grid = document.getElementById('annual-overview-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
 
-        weekCard.addEventListener('click', () => {
-            container.querySelectorAll('.week-box-btn').forEach(c => c.classList.remove('is-selected'));
-            weekCard.classList.add('is-selected');
-            showWeekWholeDetails(weekKey);
-        });
+    for (let m = 0; m < 12; m++) {
+        const rate = getMonthCompletionRate(m);
+        const rateClass = rateToClass(rate);
+        const percentText = Math.round(rate * 100) + '%';
 
-        container.appendChild(weekCard);
+        const cell = document.createElement('div');
+        cell.className = `annual-overview-cell ${rateClass}`;
+        cell.innerHTML = `
+            <div class="annual-overview-month-name">${monthNames[m]}</div>
+            <div class="annual-overview-rate">${percentText}</div>
+        `;
+        grid.appendChild(cell);
     }
+}
+
+function openAnnualOverviewModal() {
+    renderAnnualOverviewGrid();
+    const modal = document.getElementById('annual-overview-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeAnnualOverviewModal() {
+    const modal = document.getElementById('annual-overview-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function showDateDetails(dateStr, weekKey) {
@@ -154,33 +185,6 @@ function showDateDetails(dateStr, weekKey) {
         `;
     }
     if(!hasRegular) html += `<div style="color:#999; font-size:14px;">本週無任何常規任務。</div>`;
-    if (detailsEl) detailsEl.innerHTML = html;
-}
-
-function showWeekWholeDetails(weekKey) {
-    const titleEl = document.getElementById('focus-date-title');
-    const hintEl = document.getElementById('focus-date-week-hint');
-    const detailsEl = document.getElementById('focus-date-details');
-
-    if (titleEl) titleEl.innerText = `檢視：${weekKey}`;
-    if (hintEl) hintEl.innerText = `整個禮拜的任務分布總覽`;
-    
-    // 同樣直接讀 precomputeAllWeeks() 算好的快取
-    const weekData = weeklyDataStore[weekKey] || {};
-    let html = `<h4 style="margin:5px 0; color:#1a1a1a;">本週全部清單項目一覽：</h4>`;
-
-    for (let mainKey in weekData) {
-        html += `<div style="margin-top:10px; font-weight:bold; color:#1a4d6c;">大類別：${mainKey}</div>`;
-        const subItems = weekData[mainKey].subItems || {};
-        for(let subKey in subItems) {
-            const sub = subItems[subKey];
-            html += `
-                <div style="padding-left:12px; font-size:14px; margin:3px 0; color:${sub.isTemp?'#d35400':'#475569'}">
-                    ${sub.isTemp ? '臨時: ' : '- '}${subKey} (${sub.completed}/${sub.total})
-                </div>
-            `;
-        }
-    }
     if (detailsEl) detailsEl.innerHTML = html;
 }
 
@@ -237,6 +241,7 @@ function initCalendarGrid() {
     const systemDate = new Date();
     let todayStr = "2026-07-11"; 
     let systemWeekKey = "第 28 週";
+    let todayMonthIndex = 6; // 對應預設的 2026-07-11（7月，索引 6）
 
     if (systemDate.getFullYear() === 2026) {
         const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
@@ -244,16 +249,40 @@ function initCalendarGrid() {
         todayStr = `2026-${mm}-${dd}`;
         const wNum = getWeekNumberFor2026(systemDate.getMonth(), systemDate.getDate());
         systemWeekKey = `第 ${wNum} 週`;
+        todayMonthIndex = systemDate.getMonth();
     }
 
     selectedDateStr = todayStr;
+    cachedTodayStr = todayStr;
+    currentMonthIndex = todayMonthIndex;
 
-    // 先把 53 週的資料一次算好放進快取，後面畫月曆格子/週視圖/年度統計都直接讀快取，
-    // 不會像以前一樣每畫一格、每點一次都重算一次整週資料。
+    // 先把 53 週的資料一次算好放進快取，後面畫月曆格子/年度統計都直接讀快取，
+    // 不會每畫一格、每點一次都重算一次整週資料。
     precomputeAllWeeks();
 
-    renderMonthsCalendar(todayStr);
-    renderWeeksCalendar();
+    renderMonthsCalendar(currentMonthIndex, todayStr);
     try { calculateAnnualSummaryStats(); } catch (e) {}
     showDateDetails(todayStr, systemWeekKey);
+
+    // 月份導覽按鈕、年度總覽彈窗的事件綁定：用 onclick 覆蓋而不是 addEventListener 疊加，
+    // 這樣即使每次切換到年曆頁都重新呼叫一次 initCalendarGrid()，也不會重複綁定造成
+    // 「點一次上一頁/下一頁結果跳了兩個月」這種情況。
+    const prevBtn = document.getElementById('prev-month-btn');
+    if (prevBtn) prevBtn.onclick = goToPrevMonth;
+
+    const nextBtn = document.getElementById('next-month-btn');
+    if (nextBtn) nextBtn.onclick = goToNextMonth;
+
+    const openOverviewBtn = document.getElementById('open-annual-overview-btn');
+    if (openOverviewBtn) openOverviewBtn.onclick = openAnnualOverviewModal;
+
+    const closeOverviewBtn = document.getElementById('close-annual-overview-btn');
+    if (closeOverviewBtn) closeOverviewBtn.onclick = closeAnnualOverviewModal;
+
+    const overviewModal = document.getElementById('annual-overview-modal');
+    if (overviewModal) {
+        overviewModal.onclick = (e) => {
+            if (e.target === overviewModal) closeAnnualOverviewModal();
+        };
+    }
 }

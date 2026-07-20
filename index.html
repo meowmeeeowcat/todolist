@@ -56,7 +56,7 @@
                         <div id="week-picker-grid" class="week-picker-grid"></div>
                     </div>
                 </div>
-                <button id="view-calendar-btn" onclick="switchPage('calendar')" disabled title="資料載入中...">查看年度年曆總覽</button>
+                <button id="view-calendar-btn" onclick="switchPage('calendar')" disabled title="資料載入中...">年度總覽</button>
             </div>
             <div>
                 <span id="user-greeting" class="user-greeting"></span>
@@ -71,7 +71,7 @@
             </div>
 
             <div class="left-column">
-                <h1 id="chart-title">每週必做事項總覽</h1>
+                <h1 id="chart-title"><button id="back-btn" class="hidden back-icon-btn" title="返回">←</button>每週必做事項總覽</h1>
                 <div class="chart-wrapper">
                     <canvas id="todoChart"></canvas>
                 </div>
@@ -79,7 +79,7 @@
             
             <div id="todo-list-wrapper" class="todo-list-wrapper">
                 <div class="list-header">
-                    <h3>項目清單<button id="back-btn" class="hidden back-inline-btn">← 返回</button></h3>
+                    <h3>項目清單</h3>
                     <div>
                         <button id="open-add-modal-btn" style="padding: 6px 12px; font-size: 14px;">新增</button>
                         <button id="open-weight-view-btn" style="padding: 6px 12px; font-size: 14px; background-color: #7c6bd6;">加權</button>
@@ -102,21 +102,16 @@
         </div>
     </div>
 
-    <!-- ================= 年度年曆看板頁（預設隱藏，切換時才顯示） ================= -->
+    <!-- ================= 年度總覽頁（預設隱藏，切換時才顯示） ================= -->
     <div id="view-calendar" class="container calendar-main-container hidden">
         <div class="control-panel">
-            <h2>2026 年度數據智慧年曆看板</h2>
+            <h2>2026年的統計</h2>
             <button id="nav-back-btn" onclick="switchPage('todo')">返回主圖表頁</button>
         </div>
 
         <div class="calendar-top-dashboard">
-            <div class="control-actions-box">
-                <button id="tab-months" class="tab-btn active" onclick="switchView('months')">12個月傳統年曆</button>
-                <button id="tab-weeks" class="tab-btn" onclick="switchView('weeks')">53週週達成率視圖</button>
-            </div>
-            
             <div class="summary-stats-section">
-                <h3>全年度任務執行總次數累計看板（分類別統整）</h3>
+                <h3>任務總次數</h3>
                 <div id="annual-stats-classified-container" class="stats-classified-flex">
                     <div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>
                 </div>
@@ -125,8 +120,15 @@
 
         <div class="calendar-dashboard">
             <div class="calendar-left">
-                <div id="months-view-container" class="months-grid"></div>
-                <div id="weeks-view-container" class="weeks-53-grid hidden"></div>
+                <div class="month-nav-header">
+                    <div class="month-nav-controls">
+                        <button id="prev-month-btn" class="month-nav-btn" title="上個月">‹</button>
+                        <div id="current-month-label" class="current-month-label">一月</div>
+                        <button id="next-month-btn" class="month-nav-btn" title="下個月">›</button>
+                    </div>
+                    <button id="open-annual-overview-btn" class="annual-overview-btn">年度總覽</button>
+                </div>
+                <div id="months-view-container" class="single-month-grid"></div>
             </div>
 
             <div class="calendar-right">
@@ -134,6 +136,17 @@
                 <div id="focus-date-week-hint"></div>
                 <div id="focus-date-details">選擇年曆上的日期查看當天進度。</div>
             </div>
+        </div>
+    </div>
+
+    <!-- ================= 年度總覽彈窗：4x3 排列 12 個月，不可互動，只顯示各月達成率 ================= -->
+    <div id="annual-overview-modal" class="modal-overlay hidden">
+        <div class="modal-content annual-overview-content">
+            <div class="modal-header">
+                <h4>年度總覽</h4>
+                <button class="close-modal-btn" id="close-annual-overview-btn">&times;</button>
+            </div>
+            <div id="annual-overview-grid" class="annual-overview-grid"></div>
         </div>
     </div>
 
