@@ -901,7 +901,8 @@ function refreshSubWeightChartPreview(categoryKey) {
     renderPieChart('todoChart', fullSubChartData, null);
 }
 
-// 渲染「加權比例」調整頁：列出所有大類別跟底下的分項，各自可以填一個倍數
+// 渲染「加權比例」調整頁（主頁版）：只列出所有大類別，不顯示底下的分項
+// （分項的權重要進到該大類別的分項頁再點加權才會看到，跟主頁分開）
 function renderWeightEditor(weekData) {
     listContainer.innerHTML = '';
     const orderedKeys = sortKeysByOrder(weekData);
@@ -921,7 +922,7 @@ function renderWeightEditor(weekData) {
             <div class="todo-item-clickable-area"><b>${key}</b></div>
             <span class="weight-input-wrap">
                 倍數
-                <input type="number" class="weight-input" min="0.1" step="0.1" value="${getCategoryWeight(key)}">
+                <input type="number" class="weight-input" min="1" step="1" value="${getCategoryWeight(key)}">
             </span>
         `;
         const catInput = catLi.querySelector('.weight-input');
@@ -934,34 +935,6 @@ function renderWeightEditor(weekData) {
         });
         catInput.addEventListener('change', () => saveTemplate());
         listContainer.appendChild(catLi);
-
-        const subItems = item.subItems || {};
-        const orderedSubKeys = sortKeysByOrder(subItems);
-        orderedSubKeys.forEach(subKey => {
-            const subItem = subItems[subKey];
-            const subLi = document.createElement('li');
-            subLi.className = 'todo-item weight-editor-row weight-editor-subitem';
-            subLi.style.cursor = 'default';
-            subLi.style.borderLeft = `5px solid ${subItem.color}`;
-            subLi.innerHTML = `
-                <div class="todo-item-clickable-area">└ ${subKey}</div>
-                <span class="weight-input-wrap">
-                    倍數
-                    <input type="number" class="weight-input" min="0.1" step="0.1" value="${getSubItemWeight(key, subKey)}">
-                </span>
-            `;
-            const subInput = subLi.querySelector('.weight-input');
-            subInput.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                if (globalAppData.template[key] && globalAppData.template[key].subItems[subKey]) {
-                    globalAppData.template[key].subItems[subKey].weight = (!isNaN(val) && val > 0) ? val : 1;
-                    // 分項的權重不會影響「加權比例頁」目前顯示的大類別圓餅圖（那張圖只看大類別權重），
-                    // 所以這裡不用重畫圖表，只要記住值即可。
-                }
-            });
-            subInput.addEventListener('change', () => saveTemplate());
-            listContainer.appendChild(subLi);
-        });
     });
 }
 
@@ -985,7 +958,7 @@ function renderSubWeightEditor(categoryKey, subItems) {
             <div class="todo-item-clickable-area"><b>${subKey}</b></div>
             <span class="weight-input-wrap">
                 倍數
-                <input type="number" class="weight-input" min="0.1" step="0.1" value="${getSubItemWeight(categoryKey, subKey)}">
+                <input type="number" class="weight-input" min="1" step="1" value="${getSubItemWeight(categoryKey, subKey)}">
             </span>
         `;
         const subInput = subLi.querySelector('.weight-input');
