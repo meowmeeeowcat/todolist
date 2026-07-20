@@ -60,7 +60,6 @@
             </div>
             <div>
                 <span id="user-greeting" class="user-greeting"></span>
-                <button id="back-btn" class="hidden">返回主面板</button>
                 <button id="logout-btn" class="logout-btn">登出</button>
             </div>
         </div>
@@ -80,9 +79,10 @@
             
             <div id="todo-list-wrapper" class="todo-list-wrapper">
                 <div class="list-header">
-                    <h3>項目清單</h3>
+                    <h3><button id="back-btn" class="hidden back-inline-btn">← 返回</button>項目清單</h3>
                     <div>
                         <button id="open-add-modal-btn" style="padding: 6px 12px; font-size: 14px; margin-right: 5px;">新增項目</button>
+                        <button id="open-weight-view-btn" style="padding: 6px 12px; font-size: 14px; background-color: #7c6bd6; margin-right: 5px;">加權比例</button>
                         <button id="open-edit-modal-btn" style="padding: 6px 12px; font-size: 14px; background-color: #ff9f43;">編輯模式</button>
                     </div>
                 </div>

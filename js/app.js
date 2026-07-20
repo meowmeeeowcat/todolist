@@ -174,6 +174,7 @@ const addTaskBtn = document.getElementById('add-task-btn');
 
 const taskModal = document.getElementById('task-modal');
 const openAddModalBtn = document.getElementById('open-add-modal-btn');
+const openWeightViewBtn = document.getElementById('open-weight-view-btn');
 const openEditModalBtn = document.getElementById('open-edit-modal-btn');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const modalFormTitle = document.getElementById('modal-form-title');
@@ -306,6 +307,13 @@ openEditModalBtn.addEventListener('click', () => {
     todoListWrapper.classList.toggle('editing-mode');
 });
 
+openWeightViewBtn.addEventListener('click', () => {
+    todoListWrapper.classList.remove('editing-mode');
+    currentView = 'weight';
+    resetChartInstance();
+    updateView();
+});
+
 closeModalBtn.addEventListener('click', closeModal);
 taskModal.addEventListener('click', (e) => {
     if (e.target === taskModal) closeModal();
@@ -398,7 +406,7 @@ function renderTodoList(weekData) {
                 </span>
             `;
 
-            li.querySelector('.todo-item-clickable-area').addEventListener('click', () => {
+            li.addEventListener('click', () => {
                 if (todoListWrapper.classList.contains('editing-mode')) return;
                 todoListWrapper.classList.remove('editing-mode');
                 currentView = 'sub';
@@ -796,16 +804,155 @@ function switchMobileListTab(tab) {
     if (tempTabBtn) tempTabBtn.classList.toggle('active', showTemp);
 }
 
+// ================= 加權比例 =================
+// 大類別的權重：預設 1（沒設定過就是原本的比例）
+function getCategoryWeight(categoryKey) {
+    const cat = globalAppData.template[categoryKey];
+    return (cat && cat.weight) ? cat.weight : 1;
+}
+
+// 分項的權重：預設 1
+function getSubItemWeight(categoryKey, subKey) {
+    const cat = globalAppData.template[categoryKey];
+    const sub = cat && cat.subItems ? cat.subItems[subKey] : null;
+    return (sub && sub.weight) ? sub.weight : 1;
+}
+
+// 主頁圓餅圖（大類別）：completed/total 都乘上該大類別的權重，再拿去畫圖
+function applyMainWeights(weekData) {
+    const result = {};
+    for (let key in weekData) {
+        const item = weekData[key];
+        const weight = getCategoryWeight(key);
+        result[key] = {
+            ...item,
+            completed: (item.completed || 0) * weight,
+            total: (item.total || 0) * weight
+        };
+    }
+    return result;
+}
+
+// 分項圓餅圖：completed/total 都乘上該分項的權重，再拿去畫圖
+function applySubWeights(subItems, categoryKey) {
+    const result = {};
+    for (let subKey in subItems) {
+        const item = subItems[subKey];
+        const weight = getSubItemWeight(categoryKey, subKey);
+        result[subKey] = {
+            ...item,
+            completed: (item.completed || 0) * weight,
+            total: (item.total || 0) * weight
+        };
+    }
+    return result;
+}
+
+// 加權比例調整頁專用：把每個大類別都當作「全部完成」，只用 total * 權重 來看比例，
+// 這樣圓餅圖不會有灰色的「未完成」區塊，使用者可以更直觀地比較各項目間的相對大小。
+function getFullCompletionChartData(weekData) {
+    const fakeData = {};
+    for (let key in weekData) {
+        const item = weekData[key];
+        const weight = getCategoryWeight(key);
+        const weightedTotal = (item.total || 0) * weight;
+        fakeData[key] = { ...item, completed: weightedTotal, total: weightedTotal };
+    }
+    return getChartData(fakeData, false);
+}
+
+// 加權比例調整頁：輸入數字當下只重畫圓餅圖預覽（不重繪整份清單，避免每打一個字輸入框就失焦），
+// 離開該欄位（change事件，通常是切到下一格或點掉）時才真正存進 Firebase。
+function refreshWeightChartPreview() {
+    calculateMainItems(currentWeek);
+    const weekData = getRegularOnlyWeekData(weeklyDataStore[currentWeek]);
+    const fullChartData = getFullCompletionChartData(weekData);
+    renderPieChart('todoChart', fullChartData, null);
+}
+
+// 渲染「加權比例」調整頁：列出所有大類別跟底下的分項，各自可以填一個倍數
+function renderWeightEditor(weekData) {
+    listContainer.innerHTML = '';
+    const orderedKeys = sortKeysByOrder(weekData);
+
+    if (orderedKeys.length === 0) {
+        listContainer.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">目前沒有常規項目可以調整加權比例。</li>`;
+        return;
+    }
+
+    orderedKeys.forEach(key => {
+        const item = weekData[key];
+        const catLi = document.createElement('li');
+        catLi.className = 'todo-item weight-editor-row';
+        catLi.style.cursor = 'default';
+        catLi.style.borderLeft = `5px solid ${item.color || '#36a2eb'}`;
+        catLi.innerHTML = `
+            <div class="todo-item-clickable-area"><b>${key}</b></div>
+            <span class="weight-input-wrap">
+                倍數
+                <input type="number" class="weight-input" min="0.1" step="0.1" value="${getCategoryWeight(key)}">
+            </span>
+        `;
+        const catInput = catLi.querySelector('.weight-input');
+        catInput.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (globalAppData.template[key]) {
+                globalAppData.template[key].weight = (!isNaN(val) && val > 0) ? val : 1;
+                refreshWeightChartPreview();
+            }
+        });
+        catInput.addEventListener('change', () => saveTemplate());
+        listContainer.appendChild(catLi);
+
+        const subItems = item.subItems || {};
+        const orderedSubKeys = sortKeysByOrder(subItems);
+        orderedSubKeys.forEach(subKey => {
+            const subItem = subItems[subKey];
+            const subLi = document.createElement('li');
+            subLi.className = 'todo-item weight-editor-row weight-editor-subitem';
+            subLi.style.cursor = 'default';
+            subLi.style.borderLeft = `5px solid ${subItem.color}`;
+            subLi.innerHTML = `
+                <div class="todo-item-clickable-area">└ ${subKey}</div>
+                <span class="weight-input-wrap">
+                    倍數
+                    <input type="number" class="weight-input" min="0.1" step="0.1" value="${getSubItemWeight(key, subKey)}">
+                </span>
+            `;
+            const subInput = subLi.querySelector('.weight-input');
+            subInput.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (globalAppData.template[key] && globalAppData.template[key].subItems[subKey]) {
+                    globalAppData.template[key].subItems[subKey].weight = (!isNaN(val) && val > 0) ? val : 1;
+                    // 分項的權重不會影響「加權比例頁」目前顯示的大類別圓餅圖（那張圖只看大類別權重），
+                    // 所以這裡不用重畫圖表，只要記住值即可。
+                }
+            });
+            subInput.addEventListener('change', () => saveTemplate());
+            listContainer.appendChild(subLi);
+        });
+    });
+}
+
 function updateView() {
     calculateMainItems(currentWeek);
     fullWeekData = weeklyDataStore[currentWeek];
     const weekData = getRegularOnlyWeekData(fullWeekData); // 主頁圖表/項目清單只看常規任務，臨時任務不計入總覽
 
-    if (currentView === 'main') {
+    if (currentView === 'weight') {
+        // 加權比例調整頁：圓餅圖顯示「全部當作已完成」的樣子（沒有灰色未完成區塊），
+        // 這樣使用者可以直接看出調整倍數後、各項目在圖上實際佔的比例。
+        titleEl.innerText = "加權比例調整";
+        backBtn.classList.remove('hidden');
+
+        const fullChartData = getFullCompletionChartData(weekData);
+        renderPieChart('todoChart', fullChartData, null);
+        renderWeightEditor(weekData);
+    } else if (currentView === 'main') {
         titleEl.innerText = currentWeek + " - 必做事項總覽";
         backBtn.classList.add('hidden');
 
-        const mainChartData = getChartData(weekData, false);
+        const mainChartData = getChartData(applyMainWeights(weekData), false);
         renderPieChart('todoChart', mainChartData, (clickedIndex) => {
             if (todoListWrapper.classList.contains('editing-mode')) return;
             const label = mainChartData.labels[clickedIndex];
@@ -819,16 +966,17 @@ function updateView() {
                 updateView();
             }
         });
+        renderTodoList(weekData);
     } else {
         titleEl.innerText = currentSubKey + " - 分項進度";
         backBtn.classList.remove('hidden');
 
         const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
-        const subChartData = getChartData(subItems, true);
+        const subChartData = getChartData(applySubWeights(subItems, currentSubKey), true);
         renderPieChart('todoChart', subChartData, null);
+        renderTodoList(weekData);
     }
 
-    renderTodoList(weekData);
     renderTempTaskList();
     if (!taskModal.classList.contains('hidden')) {
         updateCategorySelectOptions();

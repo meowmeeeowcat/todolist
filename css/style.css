@@ -166,6 +166,19 @@ select:focus, input:focus {
     margin: 0;
     color: #1a4d6c;
     font-size: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.back-inline-btn {
+    background-color: #64748b;
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+.back-inline-btn:hover {
+    background-color: #475569;
 }
 
 #todo-list, #temp-task-list {
@@ -293,6 +306,32 @@ select:focus, input:focus {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+/* ================= 加權比例調整頁 ================= */
+.weight-editor-row {
+    cursor: default;
+}
+.weight-editor-subitem {
+    margin-left: 20px;
+    background: #f8fafc;
+    box-shadow: none;
+    border-left-style: dashed !important;
+}
+.weight-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #475569;
+    font-weight: bold;
+    white-space: nowrap;
+}
+.weight-input {
+    width: 60px;
+    padding: 4px 6px;
+    font-size: 14px;
+    text-align: center;
 }
 
 /* ================= 彈出視窗 (Modal) 樣式 ================= */
