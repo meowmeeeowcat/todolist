@@ -43,6 +43,14 @@ initFirebaseAuth(() => {
     if (typeof switchPage === 'function') switchPage('todo');
 });
 
+const openTempEditModalBtn = document.getElementById('open-temp-edit-modal-btn');
+if (openTempEditModalBtn) {
+    openTempEditModalBtn.addEventListener('click', () => {
+        const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
+        if (tempListWrapperEl) tempListWrapperEl.classList.toggle('editing-mode');
+    });
+}
+
 // 今天的日期字串（2026 年格式），系統年份不是 2026 時退而回傳固定預設值
 function getTodayDateStr2026() {
     const systemDate = new Date();
@@ -296,8 +304,6 @@ openAddModalBtn.addEventListener('click', () => {
 
 openEditModalBtn.addEventListener('click', () => {
     todoListWrapper.classList.toggle('editing-mode');
-    const tempListWrapper = document.getElementById('temp-task-list-wrapper');
-    if (tempListWrapper) tempListWrapper.classList.toggle('editing-mode', todoListWrapper.classList.contains('editing-mode'));
 });
 
 closeModalBtn.addEventListener('click', closeModal);
@@ -729,6 +735,7 @@ function renderTempHistoryList() {
             </div>
             <span class="history-actions">
                 <button class="edit-btn restore-btn">加回來</button>
+                <button class="delete-btn delete-history-btn">刪除</button>
             </span>
         `;
 
@@ -738,6 +745,13 @@ function renderTempHistoryList() {
             saveTempTasksTree();
             renderTempHistoryList();
             updateView();
+        });
+
+        li.querySelector('.delete-history-btn').addEventListener('click', () => {
+            if (!confirm(`確定要永久刪除「${task.name}」這筆歷史紀錄嗎？此操作無法復原。`)) return;
+            globalAppData.tempTasks = deleteTempTaskFilter(task.id);
+            saveTempTasksTree();
+            renderTempHistoryList();
         });
 
         historyList.appendChild(li);
@@ -979,8 +993,10 @@ function renderWeekPickerGrid() {
     if (!weekPickerGrid) return;
     weekPickerGrid.innerHTML = '';
     const todayWeekKey = getTodayWeekKey();
+    // 已經過去的週次（今天所在週次之前）不再顯示在選單裡，只留下本週跟之後的週次
+    const todayWeekNum = todayWeekKey ? parseInt(todayWeekKey.replace(/[^0-9]/g, ''), 10) : 1;
 
-    for (let w = 1; w <= 53; w++) {
+    for (let w = todayWeekNum; w <= 53; w++) {
         const weekKeyStr = `第 ${w} 週`;
         const btn = document.createElement('button');
         btn.type = 'button';

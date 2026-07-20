@@ -2,7 +2,7 @@
 // firebaseConfig / auth / db 的初始化已搬到共用檔案 js/firebase-init.js
 
 const monthNames = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
-const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
 
 let currentActiveView = 'months'; 
 let selectedDateStr = "";
@@ -31,7 +31,7 @@ function renderMonthsCalendar(todayStr) {
     const container = document.getElementById('months-view-container');
     if (!container) return;
     container.innerHTML = '';
-    let currentFirstDayOfWeek = 4; // 2026-01-01 是週四
+    let currentFirstDayOfWeek = 3; // 2026-01-01 是週四，週一起始的陣列中索引為 3（一=0,二=1,三=2,四=3）
 
     for (let m = 0; m < 12; m++) {
         const monthCard = document.createElement('div');

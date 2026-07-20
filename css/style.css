@@ -168,7 +168,7 @@ select:focus, input:focus {
     font-size: 20px;
 }
 
-#todo-list {
+#todo-list, #temp-task-list {
     list-style: none;
     padding: 0;
     margin: 0;
