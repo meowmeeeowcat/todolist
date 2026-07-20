@@ -245,8 +245,8 @@ function openModal(title) {
 }
 
 // 臨時任務不用選顏色（統一用固定色，跟項目清單同色調）；
-// 常規任務只有「新增全新大類別」時才需要挑顏色，幫既有分類新增子項目時直接沿用該分類本身的顏色。
-// 編輯模式（editingContext 有值）維持原本行為，常規任務一律顯示調色盤。
+// 常規任務只有「新增全新大類別」或「編輯大類別本身」時才需要挑顏色；
+// 幫既有分類新增子項目、或編輯既有子項目時，顏色一律直接沿用該分類本身的顏色，不給使用者自己選。
 function toggleColorPickerVisibility() {
     const colorSection = document.getElementById('color-picker-section');
     if (!colorSection) return;
@@ -255,7 +255,7 @@ function toggleColorPickerVisibility() {
         return;
     }
     if (editingContext) {
-        colorSection.classList.remove('hidden');
+        colorSection.classList.toggle('hidden', editingContext.type === 'sub-item');
         return;
     }
     const isNewCategory = (categorySelect.value === '__new__');
@@ -845,26 +845,20 @@ addTaskBtn.addEventListener('click', () => {
             const newName = newCategoryInput.value.trim();
             if (!newName) return;
 
-            const changeColor = confirm(`是否將此大類別的基礎色調更新為目前選定的顏色？`);
-
             if (globalAppData.template[key]) {
                 if (newName !== key) {
                     globalAppData.template[newName] = globalAppData.template[key];
                     delete globalAppData.template[key];
                 }
-                if (changeColor) {
-                    // 確保精確儲存當前選中項目的 hue
-                    globalAppData.template[newName].customHue = selectedPaletteItem.hue;
-                }
+                // 直接套用目前選定的顏色，不用再跳一次確認框
+                globalAppData.template[newName].customHue = selectedPaletteItem.hue;
             }
             
             globalAppData.tempTasks.forEach(t => { 
                 if(t.category === key) {
                     t.category = newName;
-                    if (changeColor) {
-                        t.customHue = chosenHue;
-                        t.color = chosenColor;
-                    }
+                    t.customHue = chosenHue;
+                    t.color = chosenColor;
                 }
             });
 
@@ -898,10 +892,13 @@ addTaskBtn.addEventListener('click', () => {
                     }
                 }
                 template[newName].total = newTotal;
-                if (confirm("是否將此任務套用目前選擇的顏色？")) {
-                    // 修正：明確指向選中物件的 hue，避免變數因閉包或非同步產生對齊落差
-                    template[newName].customHue = selectedPaletteItem.hue;
-               }
+                // 分項顏色一律跟隨大類別，不開放使用者自己選色
+                const parentHue = findCategoryHue(currentSubKey);
+                if (parentHue !== undefined) {
+                    template[newName].customHue = parentHue;
+                } else {
+                    delete template[newName].customHue;
+                }
                 saveTemplate();
                 saveProgressTree();
             }
