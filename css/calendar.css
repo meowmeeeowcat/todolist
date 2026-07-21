@@ -84,10 +84,11 @@
 
 .calendar-right {
     width: 320px;
-    background: #f0fdfa;
+    background: #ffffff;
     padding: 20px;
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(75, 192, 192, 0.05);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid #eef2f5;
     border-left: 5px solid #4bc0c0;
 }
 

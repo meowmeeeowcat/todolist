@@ -17,9 +17,10 @@
 
 <body>
 
-    <!-- 版本標籤：每次要上傳新版本前，先把下面這行的文字改成當天日期（或隨便一個好辨識的字），
-         上傳部署完成後，直接看網站右下角有沒有變成您剛剛改的那個文字，就知道是不是最新版了。 -->
-    <div id="site-version-badge" style="position:fixed; bottom:6px; right:10px; font-size:11px; color:#94a3b8; z-index:1500; user-select:none; pointer-events:none;">v2026-07-14</div>
+    <!-- 版本按鈕：實際顯示的版本號與更新內容都由 js/version.js 的 VERSION_HISTORY 陣列控制，
+         每次要上傳新版本前，只要在該陣列最上面新增一筆新版本紀錄即可，按鈕會自動顯示最新版本號。
+         點擊按鈕可以打開版本更新紀錄視窗，查看每個版本改了什麼。 -->
+    <button id="site-version-badge" class="version-badge-btn" title="查看版本更新紀錄">v...</button>
 
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner"></div>
@@ -71,7 +72,7 @@
             </div>
 
             <div class="left-column">
-                <h1 id="chart-title"><button id="back-btn" class="hidden back-icon-btn" title="返回">←</button>每週必做事項總覽</h1>
+                <h1 id="chart-title"><button id="back-btn" class="hidden back-icon-btn" title="返回">←</button><span id="chart-title-text">每週必做事項總覽</span></h1>
                 <div class="chart-wrapper">
                     <canvas id="todoChart"></canvas>
                 </div>
@@ -93,6 +94,7 @@
                 <div class="list-header">
                     <h3>臨時待辦</h3>
                     <div>
+                        <button id="open-add-temp-modal-btn" style="padding: 6px 12px; font-size: 13px;">新增</button>
                         <button id="open-temp-edit-modal-btn" style="padding: 6px 12px; font-size: 13px; background-color: #ff9f43;">編輯模式</button>
                         <button id="open-temp-history-btn" style="padding: 6px 12px; font-size: 13px; background-color: #64748b;">歷史紀錄</button>
                     </div>
@@ -160,7 +162,7 @@
 
             <div id="add-task-form" class="add-form">
                 <div class="form-row">
-                    <select id="task-type-select" onchange="toggleTaskTypeView()">
+                    <select id="task-type-select" class="hidden" onchange="toggleTaskTypeView()">
                         <option value="regular">每週重複常規任務</option>
                         <option value="temporary">按特定日期臨時任務</option>
                     </select>
@@ -190,6 +192,17 @@
         </div>
     </div>
 
+    <!-- ================= 版本更新紀錄彈窗 ================= -->
+    <div id="version-history-modal" class="modal-overlay hidden">
+        <div class="modal-content version-history-content">
+            <div class="modal-header">
+                <h4>版本更新紀錄</h4>
+                <button class="close-modal-btn" id="close-version-history-btn">&times;</button>
+            </div>
+            <div id="version-history-list"></div>
+        </div>
+    </div>
+
     <!-- ================= 臨時任務歷史紀錄（已完成的） ================= -->
     <div id="temp-history-modal" class="modal-overlay hidden">
         <div class="modal-content">
@@ -209,5 +222,6 @@
     <script src="js/app.js" defer></script>
     <script src="js/calendar.js" defer></script>
     <script src="js/spa.js" defer></script>
+    <script src="js/version.js" defer></script>
 </body>
 </html>

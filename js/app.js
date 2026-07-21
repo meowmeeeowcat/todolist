@@ -156,6 +156,7 @@ function loadDataFromStorage() {
 }
 // =======================================================
 const titleEl = document.getElementById('chart-title');
+const chartTitleTextEl = document.getElementById('chart-title-text');
 const backBtn = document.getElementById('back-btn');
 const listContainer = document.getElementById('todo-list');
 const weekPickerToggleBtn = document.getElementById('week-picker-toggle-btn');
@@ -241,12 +242,15 @@ function renderColorPalette() {
     });
 }
 
-function openModal(title) {
+function openModal(title, forcedType) {
     modalFormTitle.innerText = title;
     taskModal.classList.remove('hidden');
+    if (forcedType) {
+        taskTypeSelect.value = forcedType;
+    }
     updateCategorySelectOptions();
     renderColorPalette(); // 開啟時載入調色盤
-    toggleColorPickerVisibility();
+    toggleTaskTypeView(); // 依目前的任務類型（forcedType 或既有值）同步欄位顯示，並連帶處理顏色選擇區塊
 }
 
 // 臨時任務不用選顏色（統一用固定色，跟項目清單同色調）；
@@ -304,8 +308,15 @@ function closeModal() {
 }
 
 openAddModalBtn.addEventListener('click', () => {
-    openModal("新增任務事項");
+    openModal("新增任務事項", 'regular');
 });
+
+const openAddTempModalBtn = document.getElementById('open-add-temp-modal-btn');
+if (openAddTempModalBtn) {
+    openAddTempModalBtn.addEventListener('click', () => {
+        openModal("新增臨時待辦事項", 'temporary');
+    });
+}
 
 openEditModalBtn.addEventListener('click', () => {
     todoListWrapper.classList.toggle('editing-mode');
@@ -986,19 +997,19 @@ function updateView() {
         backBtn.classList.remove('hidden');
 
         if (weightViewSourceView === 'sub' && weightViewSourceSubKey) {
-            titleEl.innerText = weightViewSourceSubKey + " - 分項加權比例調整";
+            chartTitleTextEl.innerText = weightViewSourceSubKey + " - 分項加權比例調整";
             const subItems = weekData[weightViewSourceSubKey] ? weekData[weightViewSourceSubKey].subItems : {};
             const fullSubChartData = getFullCompletionChartDataForSub(subItems, weightViewSourceSubKey);
             renderPieChart('todoChart', fullSubChartData, null);
             renderSubWeightEditor(weightViewSourceSubKey, subItems);
         } else {
-            titleEl.innerText = "加權比例調整";
+            chartTitleTextEl.innerText = "加權比例調整";
             const fullChartData = getFullCompletionChartData(weekData);
             renderPieChart('todoChart', fullChartData, null);
             renderWeightEditor(weekData);
         }
     } else if (currentView === 'main') {
-        titleEl.innerText = currentWeek + " - 必做事項總覽";
+        chartTitleTextEl.innerText = currentWeek + " - 必做事項總覽";
         backBtn.classList.add('hidden');
 
         const mainChartData = getChartData(applyMainWeights(weekData), false);
@@ -1017,7 +1028,7 @@ function updateView() {
         });
         renderTodoList(weekData);
     } else {
-        titleEl.innerText = currentSubKey + " - 分項進度";
+        chartTitleTextEl.innerText = currentSubKey + " - 分項進度";
         backBtn.classList.remove('hidden');
 
         const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
