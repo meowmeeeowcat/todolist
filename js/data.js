@@ -73,13 +73,12 @@ function assembleWeeklyData(weekKey, template) {
             mainTotal += total;
             mainCompleted += completed;
 
-            let subHue = subItem.customHue !== undefined ? subItem.customHue : hueValue;
-            let subMatchedPalette = (window.fixedPalette && window.fixedPalette.find(p => p.hue === subHue)) || matchedPalette;
-            
+            // 分項顏色一律強制對齊大類別本身的顏色，不再讀取分項自己存的 customHue。
+            // 這樣即使是很久以前建立、顏色改不掉的舊分項，畫面上也會統一顯示跟大類別相同的顏色。
             window.weeklyDataStore[weekKey][mainKey].subItems[subKey] = {
                 total: total,
                 completed: completed,
-                color: subMatchedPalette.color,
+                color: matchedPalette.color,
                 order: subItem.order || 0,
                 isTemp: false
             };

@@ -157,7 +157,6 @@ function loadDataFromStorage() {
 // =======================================================
 const titleEl = document.getElementById('chart-title');
 const chartTitleTextEl = document.getElementById('chart-title-text');
-const backBtn = document.getElementById('back-btn');
 const listContainer = document.getElementById('todo-list');
 const weekPickerToggleBtn = document.getElementById('week-picker-toggle-btn');
 const weekPickerPanel = document.getElementById('week-picker-panel');
@@ -324,15 +323,33 @@ openEditModalBtn.addEventListener('click', () => {
 
 openWeightViewBtn.addEventListener('click', () => {
     todoListWrapper.classList.remove('editing-mode');
-    // 記住目前是從主頁還是分項頁點進來的，這樣加權比例頁才知道要顯示所有大類別、還是只顯示這個大類別底下的分項
-    if (currentView !== 'weight') {
+
+    if (currentView === 'weight') {
+        // 再按一次「加權」按鈕本身：回到原本點進來的那一頁（主頁或某個大類別的分項頁）
+        currentView = weightViewSourceView;
+        currentSubKey = (weightViewSourceView === 'sub') ? weightViewSourceSubKey : null;
+    } else {
+        // 記住目前是從主頁還是分項頁點進來的，這樣加權比例頁才知道要顯示所有大類別、還是只顯示這個大類別底下的分項
         weightViewSourceView = currentView;
         weightViewSourceSubKey = currentSubKey;
+        currentView = 'weight';
     }
-    currentView = 'weight';
     resetChartInstance();
     updateView();
 });
+
+// 「項目清單」標題本身就是返回主頁的按鈕：不管目前在分項頁還是加權比例頁，點一下都直接回到主頁總覽
+const todoListTitleBtn = document.getElementById('todo-list-title-btn');
+if (todoListTitleBtn) {
+    todoListTitleBtn.addEventListener('click', () => {
+        if (currentView === 'main') return;
+        todoListWrapper.classList.remove('editing-mode');
+        currentView = 'main';
+        currentSubKey = null;
+        resetChartInstance();
+        updateView();
+    });
+}
 
 closeModalBtn.addEventListener('click', closeModal);
 taskModal.addEventListener('click', (e) => {
@@ -838,16 +855,32 @@ function getSubItemWeight(categoryKey, subKey) {
     return (sub && sub.weight) ? sub.weight : 1;
 }
 
-// 主頁圓餅圖（大類別）：completed/total 都乘上該大類別的權重，再拿去畫圖
+// 把某個大類別底下每個分項的 total/completed 都乘上「該分項自己的權重」再加總起來。
+// 這樣分項在自己的加權比例調整頁裡設定的倍數，才會往上反映到大類別在主頁圓餅圖上實際佔的比例，
+// 而不是分項的加權只影響分項自己那一層的圖。
+function getCategoryWeightedTotals(categoryKey, subItems) {
+    let total = 0, completed = 0;
+    for (let subKey in (subItems || {})) {
+        const item = subItems[subKey];
+        const subWeight = getSubItemWeight(categoryKey, subKey);
+        total += (item.total || 0) * subWeight;
+        completed += (item.completed || 0) * subWeight;
+    }
+    return { total, completed };
+}
+
+// 主頁圓餅圖（大類別）：先把底下每個分項各自的權重加總起來（分項的加權要往上影響大類別的佔比），
+// 再乘上這個大類別本身的權重，兩層權重疊加後才拿去畫圖。
 function applyMainWeights(weekData) {
     const result = {};
     for (let key in weekData) {
         const item = weekData[key];
-        const weight = getCategoryWeight(key);
+        const catWeight = getCategoryWeight(key);
+        const subWeighted = getCategoryWeightedTotals(key, item.subItems || {});
         result[key] = {
             ...item,
-            completed: (item.completed || 0) * weight,
-            total: (item.total || 0) * weight
+            completed: subWeighted.completed * catWeight,
+            total: subWeighted.total * catWeight
         };
     }
     return result;
@@ -870,12 +903,14 @@ function applySubWeights(subItems, categoryKey) {
 
 // 加權比例調整頁專用：把每個大類別都當作「全部完成」，只用 total * 權重 來看比例，
 // 這樣圓餅圖不會有灰色的「未完成」區塊，使用者可以更直觀地比較各項目間的相對大小。
+// 這裡的 total 同樣是先疊加分項各自的權重，再乘上大類別本身的權重，跟主頁圖表算法保持一致。
 function getFullCompletionChartData(weekData) {
     const fakeData = {};
     for (let key in weekData) {
         const item = weekData[key];
-        const weight = getCategoryWeight(key);
-        const weightedTotal = (item.total || 0) * weight;
+        const catWeight = getCategoryWeight(key);
+        const subWeighted = getCategoryWeightedTotals(key, item.subItems || {});
+        const weightedTotal = subWeighted.total * catWeight;
         fakeData[key] = { ...item, completed: weightedTotal, total: weightedTotal };
     }
     return getChartData(fakeData, false);
@@ -994,7 +1029,7 @@ function updateView() {
         // 加權比例調整頁：圓餅圖顯示「全部當作已完成」的樣子（沒有灰色未完成區塊），
         // 這樣使用者可以直接看出調整倍數後、各項目在圖上實際佔的比例。
         // 根據是從哪個頁面點進來的做拆分：主頁點進來 → 顯示所有大類別；分項頁點進來 → 只顯示該大類別底下的分項。
-        backBtn.classList.remove('hidden');
+        openWeightViewBtn.innerText = "返回"; // 再按一次這顆按鈕本身就會回到原本進來的那一頁
 
         if (weightViewSourceView === 'sub' && weightViewSourceSubKey) {
             chartTitleTextEl.innerText = weightViewSourceSubKey + " - 分項加權比例調整";
@@ -1010,7 +1045,7 @@ function updateView() {
         }
     } else if (currentView === 'main') {
         chartTitleTextEl.innerText = currentWeek + " - 必做事項總覽";
-        backBtn.classList.add('hidden');
+        openWeightViewBtn.innerText = "加權";
 
         const mainChartData = getChartData(applyMainWeights(weekData), false);
         renderPieChart('todoChart', mainChartData, (clickedIndex) => {
@@ -1029,7 +1064,7 @@ function updateView() {
         renderTodoList(weekData);
     } else {
         chartTitleTextEl.innerText = currentSubKey + " - 分項進度";
-        backBtn.classList.remove('hidden');
+        openWeightViewBtn.innerText = "加權";
 
         const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
         const subChartData = getChartData(applySubWeights(subItems, currentSubKey), true);
@@ -1181,20 +1216,6 @@ addTaskBtn.addEventListener('click', () => {
     saveTemplate();
 
     closeModal();
-    updateView();
-});
-
-backBtn.addEventListener('click', () => {
-    todoListWrapper.classList.remove('editing-mode');
-    if (currentView === 'weight') {
-        // 從加權比例頁返回：回到原本點進來的那一頁（主頁或某個大類別的分項頁）
-        currentView = weightViewSourceView;
-        currentSubKey = (weightViewSourceView === 'sub') ? weightViewSourceSubKey : null;
-    } else {
-        currentView = 'main';
-        currentSubKey = null;
-    }
-    resetChartInstance();
     updateView();
 });
 

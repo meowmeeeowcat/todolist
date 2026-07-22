@@ -259,7 +259,13 @@
     padding: 18px 8px;
     border-radius: 10px;
     text-align: center;
-    cursor: default;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.annual-overview-cell:hover {
+    transform: scale(1.06);
+    box-shadow: 0 2px 8px rgba(54, 162, 235, 0.25);
 }
 
 .annual-overview-month-name {

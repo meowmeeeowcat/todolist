@@ -220,21 +220,13 @@ select:focus, input:focus {
     gap: 8px;
 }
 
-.back-icon-btn {
-    background-color: #64748b;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    font-size: 18px;
-    line-height: 1;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+#todo-list-title-btn {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s ease;
 }
-.back-icon-btn:hover {
-    background-color: #475569;
+#todo-list-title-btn:hover {
+    color: #36a2eb;
 }
 
 #todo-list, #temp-task-list {

@@ -108,7 +108,7 @@ function goToNextMonth() {
     renderMonthsCalendar(currentMonthIndex, cachedTodayStr);
 }
 
-// 年度總覽彈窗：4x3 排列 12 個月，只顯示每個月的達成率，不可點擊互動
+// 年度總覽彈窗：4x3 排列 12 個月，顯示每個月的達成率，點擊任一月份可直接切換月曆頁到該月
 function renderAnnualOverviewGrid() {
     const grid = document.getElementById('annual-overview-grid');
     if (!grid) return;
@@ -125,6 +125,11 @@ function renderAnnualOverviewGrid() {
             <div class="annual-overview-month-name">${monthNames[m]}</div>
             <div class="annual-overview-rate">${percentText}</div>
         `;
+        cell.addEventListener('click', () => {
+            currentMonthIndex = m;
+            renderMonthsCalendar(currentMonthIndex, cachedTodayStr);
+            closeAnnualOverviewModal();
+        });
         grid.appendChild(cell);
     }
 }

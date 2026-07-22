@@ -72,7 +72,7 @@
             </div>
 
             <div class="left-column">
-                <h1 id="chart-title"><button id="back-btn" class="hidden back-icon-btn" title="返回">←</button><span id="chart-title-text">每週必做事項總覽</span></h1>
+                <h1 id="chart-title"><span id="chart-title-text">每週必做事項總覽</span></h1>
                 <div class="chart-wrapper">
                     <canvas id="todoChart"></canvas>
                 </div>
@@ -80,7 +80,7 @@
             
             <div id="todo-list-wrapper" class="todo-list-wrapper">
                 <div class="list-header">
-                    <h3>項目清單</h3>
+                    <h3 id="todo-list-title-btn" title="返回主頁項目清單">項目清單</h3>
                     <div>
                         <button id="open-add-modal-btn" style="padding: 6px 12px; font-size: 14px;">新增</button>
                         <button id="open-weight-view-btn" style="padding: 6px 12px; font-size: 14px; background-color: #7c6bd6;">加權</button>
@@ -141,7 +141,7 @@
         </div>
     </div>
 
-    <!-- ================= 年度總覽彈窗：4x3 排列 12 個月，不可互動，只顯示各月達成率 ================= -->
+    <!-- ================= 年度總覽彈窗：4x3 排列 12 個月，點擊任一月份可直接切換到該月 ================= -->
     <div id="annual-overview-modal" class="modal-overlay hidden">
         <div class="modal-content annual-overview-content">
             <div class="modal-header">
