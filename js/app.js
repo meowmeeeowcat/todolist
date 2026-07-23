@@ -44,10 +44,25 @@ initFirebaseAuth(() => {
 });
 
 const openTempEditModalBtn = document.getElementById('open-temp-edit-modal-btn');
+
+// 常規清單／臨時清單各自的「編輯」按鈕：跟「加權」按鈕一樣，進入編輯模式後按鈕文字會變成「返回」，
+// 使用者再按一次同一顆按鈕就會離開編輯模式，不用再另外找返回鍵。
+function setTodoEditingMode(active) {
+    todoListWrapper.classList.toggle('editing-mode', active);
+    if (openEditModalBtn) openEditModalBtn.innerText = active ? '返回' : '編輯';
+}
+
+function setTempEditingMode(active) {
+    const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
+    if (tempListWrapperEl) tempListWrapperEl.classList.toggle('editing-mode', active);
+    if (openTempEditModalBtn) openTempEditModalBtn.innerText = active ? '返回' : '編輯模式';
+}
+
 if (openTempEditModalBtn) {
     openTempEditModalBtn.addEventListener('click', () => {
         const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
-        if (tempListWrapperEl) tempListWrapperEl.classList.toggle('editing-mode');
+        const isActive = !!(tempListWrapperEl && tempListWrapperEl.classList.contains('editing-mode'));
+        setTempEditingMode(!isActive);
     });
 }
 
@@ -304,6 +319,8 @@ function closeModal() {
     todoListWrapper.classList.remove('editing-mode');
     const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
     if (tempListWrapperEl) tempListWrapperEl.classList.remove('editing-mode');
+    if (openEditModalBtn) openEditModalBtn.innerText = '編輯';
+    if (openTempEditModalBtn) openTempEditModalBtn.innerText = '編輯模式';
 }
 
 openAddModalBtn.addEventListener('click', () => {
@@ -318,11 +335,11 @@ if (openAddTempModalBtn) {
 }
 
 openEditModalBtn.addEventListener('click', () => {
-    todoListWrapper.classList.toggle('editing-mode');
+    setTodoEditingMode(!todoListWrapper.classList.contains('editing-mode'));
 });
 
 openWeightViewBtn.addEventListener('click', () => {
-    todoListWrapper.classList.remove('editing-mode');
+    setTodoEditingMode(false);
 
     if (currentView === 'weight') {
         // 再按一次「加權」按鈕本身：回到原本點進來的那一頁（主頁或某個大類別的分項頁）
@@ -343,7 +360,7 @@ const todoListTitleBtn = document.getElementById('todo-list-title-btn');
 if (todoListTitleBtn) {
     todoListTitleBtn.addEventListener('click', () => {
         if (currentView === 'main') return;
-        todoListWrapper.classList.remove('editing-mode');
+        setTodoEditingMode(false);
         currentView = 'main';
         currentSubKey = null;
         resetChartInstance();
@@ -426,7 +443,8 @@ function renderTodoList(weekData) {
         orderedKeys.forEach((key, index) => {
             const item = weekData[key];
             const li = document.createElement('li');
-            li.className = 'todo-item';
+            const isDone = item.total > 0 && item.completed >= item.total;
+            li.className = 'todo-item' + (isDone ? ' todo-item-completed' : '');
             li.style.borderLeft = `5px solid ${item.color || '#36a2eb'}`;
             
             li.innerHTML = `
@@ -445,7 +463,7 @@ function renderTodoList(weekData) {
 
             li.addEventListener('click', () => {
                 if (todoListWrapper.classList.contains('editing-mode')) return;
-                todoListWrapper.classList.remove('editing-mode');
+                setTodoEditingMode(false);
                 currentView = 'sub';
                 currentSubKey = key;
                 updateView();
@@ -534,7 +552,8 @@ function renderTodoList(weekData) {
         orderedSubKeys.forEach((originalKey, index) => {
             const subItem = subItems[originalKey];
             const li = document.createElement('li');
-            li.className = 'todo-item';
+            const isSubDone = subItem.total > 0 && subItem.completed >= subItem.total;
+            li.className = 'todo-item' + (isSubDone ? ' todo-item-completed' : '');
             li.style.cursor = 'default';
             li.style.borderLeft = `5px solid ${subItem.color}`;
             
@@ -658,16 +677,29 @@ function getTempTasksForWeek(weekKey) {
     return tasks;
 }
 
-// 渲染主頁旁邊的「臨時待辦」清單：這些任務不計入主頁的圖表/總覽統計
+// 取得「所有」還沒完成、還沒封存的臨時任務，不分週次 —— 之前週次的、未來週次的都會一起列出，
+// 不會因為切換到別的週次而消失。依日期排序（同一天內再用 order 排序，讓手動排序有效）。
+function getAllActiveTempTasks() {
+    const tasks = (globalAppData.tempTasks || []).filter(t => !t.archived);
+    tasks.sort((a, b) => {
+        const dateCompare = (a.date || '').localeCompare(b.date || '');
+        if (dateCompare !== 0) return dateCompare;
+        return (a.order || 0) - (b.order || 0);
+    });
+    return tasks;
+}
+
+// 渲染主頁旁邊的「臨時待辦」清單：這些任務不計入主頁的圖表/總覽統計，
+// 且不論任務日期是落在之前的週次、目前的週次還是未來的週次，只要還沒完成都會一直顯示在這裡。
 function renderTempTaskList() {
     const container = document.getElementById('temp-task-list');
     if (!container) return;
     container.innerHTML = '';
 
-    const tasks = getTempTasksForWeek(currentWeek);
+    const tasks = getAllActiveTempTasks();
 
     if (tasks.length === 0) {
-        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">本週尚無臨時任務，點「新增項目」並選擇「按特定日期臨時任務」即可加入，不用選分類也不用填次數。</li>`;
+        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">目前沒有進行中的臨時任務，點「新增」即可加入，不用選分類也不用填次數。</li>`;
         return;
     }
 
@@ -1055,7 +1087,7 @@ function updateView() {
 
             const itemKey = Object.keys(weekData)[clickedIndex];
             if (itemKey) {
-                todoListWrapper.classList.remove('editing-mode');
+                setTodoEditingMode(false);
                 currentView = 'sub';
                 currentSubKey = itemKey;
                 updateView();
@@ -1245,9 +1277,8 @@ function renderWeekPickerGrid() {
 }
 
 function selectWeek(weekKeyStr) {
-    todoListWrapper.classList.remove('editing-mode');
-    const tempListWrapperForWeek = document.getElementById('temp-task-list-wrapper');
-    if (tempListWrapperForWeek) tempListWrapperForWeek.classList.remove('editing-mode');
+    setTodoEditingMode(false);
+    setTempEditingMode(false);
 
     currentWeek = weekKeyStr;
     currentView = 'main'; currentSubKey = null;

@@ -260,6 +260,14 @@ select:focus, input:focus {
     transform: translateY(-1px);
 }
 
+/* 這週已經達標（completed >= total）的大類別或分項，底色改成灰色以跟還沒完成的項目做出區別 */
+.todo-item.todo-item-completed {
+    background: #e7eaee;
+}
+.todo-item.todo-item-completed:hover {
+    background: #dbe0e6;
+}
+
 .todo-item-clickable-area {
     flex-grow: 1;
     min-width: 120px;

@@ -10,6 +10,15 @@ function renderPieChart(canvasId, chartData, onClickCallback) {
         currentChartInstance.data.labels = chartData.labels;
         currentChartInstance.data.datasets[0].data = chartData.dataValues;
         currentChartInstance.data.datasets[0].backgroundColor = chartData.backgroundColors;
+        // 重要：圖表實例被重複使用時，也要同步更新 onClick 對應的回呼函式，
+        // 否則會殘留「上一次呼叫」時綁定的舊回呼（例如主頁圓餅圖的跳轉邏輯），
+        // 造成之後在別的頁面（例如分項圓餅圖）點擊時，還是照舊回呼的邏輯跳轉到錯誤的大類別。
+        currentChartInstance.options.onClick = (event, activeElements) => {
+            if (activeElements.length > 0 && onClickCallback) {
+                const clickedIndex = activeElements[0].index;
+                onClickCallback(clickedIndex);
+            }
+        };
         currentChartInstance.update('none'); 
         return;
     }
