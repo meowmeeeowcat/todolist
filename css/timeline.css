@@ -1,0 +1,256 @@
+/* css/timeline.css */
+
+.timeline-main-container {
+    width: 1200px;
+    height: auto;
+    max-width: 95vw;
+}
+
+.timeline-dashboard {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+    margin-top: 15px;
+}
+
+/* ================= 左側：計時器 + 項目選擇 ================= */
+.timeline-left {
+    width: 300px;
+    flex-shrink: 0;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid #eef2f5;
+}
+
+.timeline-left h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    color: #1a4d6c;
+}
+.timeline-left h3:not(:first-child) {
+    margin-top: 22px;
+}
+
+.timeline-timer-display {
+    text-align: center;
+    font-size: 42px;
+    font-weight: bold;
+    color: #1a4d6c;
+    background: #f0fdfa;
+    border-radius: 12px;
+    padding: 18px 0;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.timeline-timer-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.timeline-timer-controls input[type="number"] {
+    width: 70px;
+    flex-shrink: 0;
+    padding: 10px 8px;
+    text-align: center;
+}
+
+.timeline-timer-controls button {
+    flex: 1;
+    padding: 10px 8px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+#timeline-category-select,
+#timeline-subitem-select {
+    width: 100%;
+}
+
+.timeline-left .form-row {
+    margin-bottom: 8px;
+}
+
+.timeline-left-hint {
+    margin-top: 14px;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.6;
+}
+
+/* ================= 右側：仿 Google 日曆的週視圖 ================= */
+.timeline-right {
+    flex-grow: 1;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    border: 1px solid #eef2f5;
+    min-width: 0; /* 讓內部的 grid 可以正確縮放，不會把父層撐爆 */
+}
+
+.timeline-week-nav {
+    margin-bottom: 10px;
+}
+
+.timeline-grid-header {
+    display: grid;
+    grid-template-columns: 52px repeat(7, 1fr);
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.timeline-gutter-spacer {
+    /* 對齊左側時間刻度欄的空白格 */
+}
+
+.timeline-day-header {
+    text-align: center;
+    padding: 6px 0 10px 0;
+    color: #64748b;
+    border-left: 1px solid #f1f5f9;
+}
+
+.timeline-day-name {
+    font-size: 12px;
+}
+
+.timeline-day-num {
+    font-size: 18px;
+    font-weight: bold;
+    color: #1a4d6c;
+    margin-top: 2px;
+}
+
+.timeline-day-header.is-today .timeline-day-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #36a2eb;
+    color: white;
+}
+
+.timeline-grid-scroll {
+    max-height: 65vh;
+    overflow-y: auto;
+    border: 1px solid #f1f5f9;
+    border-top: none;
+}
+
+.timeline-grid-body {
+    display: grid;
+    grid-template-columns: 52px repeat(7, 1fr);
+    position: relative;
+}
+
+.timeline-time-gutter {
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-hour-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-align: right;
+    padding-right: 6px;
+    box-sizing: border-box;
+    transform: translateY(-7px);
+}
+
+.timeline-day-column {
+    position: relative;
+    border-left: 1px solid #f1f5f9;
+    background-image: repeating-linear-gradient(to bottom, #f1f5f9 0, #f1f5f9 1px, transparent 1px, transparent 100%);
+    background-repeat: repeat-y;
+}
+
+.timeline-day-column.is-today {
+    background-color: #f0fbfd;
+}
+
+.timeline-block {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    border-radius: 6px;
+    padding: 3px 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    font-size: 12px;
+    color: #1a4d6c;
+    font-weight: bold;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 4px;
+    cursor: default;
+}
+
+.timeline-block-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timeline-block-delete {
+    background: rgba(255,255,255,0.7);
+    color: #475569;
+    border: none;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.timeline-block-delete:hover {
+    background: white;
+    color: #d63031;
+}
+
+/* ================= RWD：手機版 ================= */
+@media (max-width: 768px) {
+    .timeline-main-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .timeline-dashboard {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .timeline-left, .timeline-right {
+        width: 100%;
+    }
+
+    .timeline-grid-header {
+        grid-template-columns: 40px repeat(7, minmax(46px, 1fr));
+        overflow-x: auto;
+    }
+    .timeline-grid-body {
+        grid-template-columns: 40px repeat(7, minmax(46px, 1fr));
+    }
+
+    .timeline-grid-scroll {
+        overflow-x: auto;
+        max-height: 60vh;
+    }
+
+    .timeline-day-num {
+        font-size: 15px;
+    }
+
+    .timeline-block {
+        font-size: 10px;
+    }
+}
