@@ -319,13 +319,13 @@
         justify-content: center;
     }
 
-    .month-nav-controls {
+    .annual-overview-btn {
         order: 1;
+        width: 100%;
     }
 
-    .annual-overview-btn {
+    .month-nav-controls {
         order: 2;
-        width: 100%;
     }
 
     .month-card.single-month-card {

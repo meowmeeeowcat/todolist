@@ -1,4 +1,8 @@
 /* css/style.css */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Segoe UI', Arial, sans-serif;
     background-color: #f0f4f8;
@@ -755,8 +759,18 @@ button:hover {
     }
 
     .control-panel {
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
         gap: 10px;
+    }
+
+    /* 使用者暱稱／登出鍵放在週次選擇器上方 */
+    .control-user-group {
+        order: 1;
+        justify-content: flex-end;
+    }
+    .control-week-group {
+        order: 2;
     }
 
     .control-panel > div {
@@ -773,8 +787,17 @@ button:hover {
         gap: 20px;
     }
 
+    /* 圓餅圖放最上面，接著是「項目清單／代辦清單」切換按鈕，清單本身排在最下面 */
     .left-column {
         width: 100%;
+        order: 1;
+    }
+    .mobile-list-tabs {
+        order: 2;
+    }
+    .todo-list-wrapper,
+    .temp-task-list-wrapper {
+        order: 3;
     }
 
     .chart-wrapper {

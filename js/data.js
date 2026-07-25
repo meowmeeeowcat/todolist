@@ -133,6 +133,21 @@ function tempTasksObjectToArray(raw) {
     return Object.values(raw);
 }
 
+// ================= timelineSessions（每日時間線的計時紀錄）儲存格式轉換 =================
+// 邏輯跟 tempTasks 完全一樣：本機用陣列方便操作，寫回 Firebase 時轉成用 id 當 key 的物件，
+// 這樣才能之後針對單一筆紀錄做局部刪除，不用每次都整包覆蓋。
+function timelineSessionsArrayToObject(arr) {
+    const obj = {};
+    (arr || []).forEach(s => { obj[s.id] = s; });
+    return obj;
+}
+
+function timelineSessionsObjectToArray(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return Object.values(raw);
+}
+
 // daysInMonths / getWeekNumberByDate / compareWeeks 已搬到共用檔案 js/date-utils.js，
 // 這裡不再重複定義（html 需要在 data.js 之前載入 date-utils.js）。
 

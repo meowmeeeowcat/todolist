@@ -38,6 +38,11 @@ initFirebaseAuth(() => {
         viewCalendarBtnEl.disabled = true;
         viewCalendarBtnEl.title = '請先登入';
     }
+    const viewTimelineBtnEl = document.getElementById('view-timeline-btn');
+    if (viewTimelineBtnEl) {
+        viewTimelineBtnEl.disabled = true;
+        viewTimelineBtnEl.title = '請先登入';
+    }
     const greetingEl = document.getElementById('user-greeting');
     if (greetingEl) greetingEl.innerText = '';
     if (typeof switchPage === 'function') switchPage('todo');
@@ -94,7 +99,8 @@ function saveDataToStorage() {
     userDbRef.set({
         template: globalAppData.template,
         progress: globalAppData.progress,
-        tempTasks: tempTasksArrayToObject(globalAppData.tempTasks)
+        tempTasks: tempTasksArrayToObject(globalAppData.tempTasks),
+        timelineSessions: timelineSessionsArrayToObject(globalAppData.timelineSessions || [])
     })
         .then(() => console.log("資料同步成功"))
         .catch(err => console.error("同步失敗:", err));
@@ -124,6 +130,14 @@ function saveTempTasksTree() {
         .catch(err => console.error("臨時任務同步失敗:", err));
 }
 
+// 每日時間線的計時紀錄有變動時（新增一段紀錄／刪除一段紀錄）才呼叫，寫入時同樣轉成用 id 當 key 的物件
+function saveTimelineSessions() {
+    if (!userDbRef) return;
+    userDbRef.child('timelineSessions').set(timelineSessionsArrayToObject(globalAppData.timelineSessions))
+        .then(() => console.log("時間線紀錄同步成功"))
+        .catch(err => console.error("時間線紀錄同步失敗:", err));
+}
+
 // 常規任務「打卡 +1 / -1」：只動 progress/{週}/{任務名} 這一個節點，並用 transaction 防止競態覆寫
 function syncRegularCounter(weekKey, taskName, delta) {
     if (!userDbRef) return;
@@ -150,20 +164,27 @@ function loadDataFromStorage() {
             if (!globalAppData.progress) globalAppData.progress = {};
             // tempTasks 在雲端可能是舊格式（陣列）或新格式（用 id 當 key 的物件），統一轉回本機用的陣列
             globalAppData.tempTasks = tempTasksObjectToArray(globalAppData.tempTasks);
+            // timelineSessions 同樣統一轉回本機用的陣列（舊帳號可能根本沒有這個欄位）
+            globalAppData.timelineSessions = timelineSessionsObjectToArray(globalAppData.timelineSessions);
         } else {
-            globalAppData = { template: {}, tempTasks: [], progress: {} };
+            globalAppData = { template: {}, tempTasks: [], progress: {}, timelineSessions: [] };
             saveDataToStorage(); // 全新使用者，第一次整包寫入是合理的
         }
         window.globalAppData = globalAppData;
         updateView();
 
-        // 資料已經抓好了，這時候才把「查看年度年曆總覽」按鈕打開，
+        // 資料已經抓好了，這時候才把「查看年度年曆總覽」「每日時間線」按鈕打開，
         // 避免使用者在資料還沒載入完成前就切過去看到空白畫面。
         window.dataLoaded = true;
         const viewCalendarBtn = document.getElementById('view-calendar-btn');
         if (viewCalendarBtn) {
             viewCalendarBtn.disabled = false;
             viewCalendarBtn.title = '';
+        }
+        const viewTimelineBtn = document.getElementById('view-timeline-btn');
+        if (viewTimelineBtn) {
+            viewTimelineBtn.disabled = false;
+            viewTimelineBtn.title = '';
         }
         const loadingOverlay = document.getElementById('loading-overlay');
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
@@ -715,9 +736,8 @@ function renderTempTaskList() {
                 <b>${task.name}</b>
             </div>
             <span class="sub-counter temp-complete-wrap">
-                <label class="temp-complete-label">
+                <label class="temp-complete-label" title="完成">
                     <input type="checkbox" class="temp-complete-checkbox">
-                    完成
                 </label>
             </span>
             <span class="actions">
@@ -741,13 +761,9 @@ function renderTempTaskList() {
             }
         });
 
-        // 勾選「完成」：直接完結並移入歷史紀錄，之後可以在歷史紀錄裡隨時加回來
+        // 勾選「完成」：直接完結並移入歷史紀錄，之後可以在歷史紀錄裡隨時加回來（不彈系統確認框，勾了就直接算數）
         li.querySelector('.temp-complete-checkbox').addEventListener('change', (e) => {
             if (!e.target.checked) return;
-            if (!confirm(`確定「${task.name}」已經完成了嗎？完成後會移到歷史紀錄，之後可以隨時從歷史紀錄加回來。`)) {
-                e.target.checked = false;
-                return;
-            }
             task.completed = 1;
             task.archived = true;
             saveTempTasksTree();
@@ -1052,10 +1068,25 @@ function renderSubWeightEditor(categoryKey, subItems) {
     });
 }
 
+// 加權／編輯按鈕的顏色跟著目前所在的大類別走：在分項頁（或該分項的加權頁）時，
+// 兩顆按鈕會變成該大類別本身的顏色，方便一眼看出目前是哪個大類別；在主頁（沒有單一大類別）時維持預設色。
+function syncActionButtonColors(weekData) {
+    const relevantKey = (currentView === 'sub')
+        ? currentSubKey
+        : (currentView === 'weight' && weightViewSourceView === 'sub') ? weightViewSourceSubKey : null;
+
+    const catColor = (relevantKey && weekData[relevantKey]) ? weekData[relevantKey].color : null;
+
+    if (openWeightViewBtn) openWeightViewBtn.style.backgroundColor = catColor || '#7c6bd6';
+    if (openEditModalBtn) openEditModalBtn.style.backgroundColor = catColor || '#ff9f43';
+}
+
 function updateView() {
     calculateMainItems(currentWeek);
     fullWeekData = weeklyDataStore[currentWeek];
     const weekData = getRegularOnlyWeekData(fullWeekData); // 主頁圖表/項目清單只看常規任務，臨時任務不計入總覽
+
+    syncActionButtonColors(weekData);
 
     if (currentView === 'weight') {
         // 加權比例調整頁：圓餅圖顯示「全部當作已完成」的樣子（沒有灰色未完成區塊），
