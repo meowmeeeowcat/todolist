@@ -37,5 +37,14 @@ function switchPage(page) {
         }
     } else {
         todoView.classList.remove('hidden');
+        // 從其他頁面切回主頁時，重新整理一次清單：
+        // 讓剛在時間線頁用番茄鐘或手動記錄的累計時間，能立刻反映在主頁大類別/分項旁邊的標籤上，不用整頁重新整理。
+        if (window.dataLoaded && typeof updateView === 'function') {
+            try {
+                updateView();
+            } catch (e) {
+                console.error("主頁刷新失敗:", e);
+            }
+        }
     }
 }

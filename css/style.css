@@ -290,6 +290,22 @@ select:focus, input:focus {
     white-space: nowrap;
 }
 
+/* 大類別／分項旁邊的「本週累計計時」標籤，資料來自每日時間線的番茄鐘/手動記錄 */
+.todo-item-timeline-tag {
+    background-color: #aefff5;
+    color: #0d6b63;
+    padding: 3px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.todo-list-wrapper.editing-mode .todo-item-progress-tag,
+.todo-list-wrapper.editing-mode .todo-item-timeline-tag {
+    display: none !important;
+}
+
 .counter-btn {
     background: #e2e8f0;
     border: none;
@@ -306,10 +322,6 @@ select:focus, input:focus {
 }
 
 /* ================= 按鈕顯示切換邏輯 ================= */
-
-.todo-list-wrapper.editing-mode .todo-item-progress-tag {
-    display: none !important;
-}
 
 .actions {
     display: none !important;
@@ -489,6 +501,23 @@ button {
 
 button:hover {
     background-color: #36a2eb;
+}
+
+/* 加權／編輯按鈕固定使用馬卡龍色盤裡的顏色，跟主頁「新增全新類別」時可選的顏色是同一套色盤 */
+.macaron-btn-red {
+    background-color: #ffb3ba;
+    color: #7a2e35;
+}
+.macaron-btn-red:hover {
+    background-color: #ff9aa4;
+}
+
+.macaron-btn-navy {
+    background-color: #c5cbff;
+    color: #2d3374;
+}
+.macaron-btn-navy:hover {
+    background-color: #aab0f5;
 }
 
 .hidden {

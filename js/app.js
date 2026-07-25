@@ -467,11 +467,16 @@ function renderTodoList(weekData) {
             const isDone = item.total > 0 && item.completed >= item.total;
             li.className = 'todo-item' + (isDone ? ' todo-item-completed' : '');
             li.style.borderLeft = `5px solid ${item.color || '#36a2eb'}`;
-            
+
+            const catMinutes = typeof getTimelineMinutesForWeek === 'function' ? getTimelineMinutesForWeek(currentWeek, key, null) : 0;
+            const catTimeText = typeof formatTimelineMinutes === 'function' ? formatTimelineMinutes(catMinutes) : null;
+            const catTimeTagHtml = catTimeText ? `<span class="todo-item-timeline-tag" title="本週累計計時">⏱ ${catTimeText}</span>` : '';
+
             li.innerHTML = `
                 <div class="todo-item-clickable-area">
                     <span class="todo-item-progress-tag">${item.completed} / ${item.total}</span>
                     <b>${key}</b>
+                    ${catTimeTagHtml}
                 </div>
                 <span class="actions">
                     <button class="move-btn move-up-btn" title="往上移" ${index === 0 ? 'disabled' : ''}>▲</button>
@@ -577,10 +582,15 @@ function renderTodoList(weekData) {
             li.className = 'todo-item' + (isSubDone ? ' todo-item-completed' : '');
             li.style.cursor = 'default';
             li.style.borderLeft = `5px solid ${subItem.color}`;
-            
+
+            const subMinutes = typeof getTimelineMinutesForWeek === 'function' ? getTimelineMinutesForWeek(currentWeek, currentSubKey, originalKey) : 0;
+            const subTimeText = typeof formatTimelineMinutes === 'function' ? formatTimelineMinutes(subMinutes) : null;
+            const subTimeTagHtml = subTimeText ? `<span class="todo-item-timeline-tag" title="本週累計計時">⏱ ${subTimeText}</span>` : '';
+
             li.innerHTML = `
                 <div class="todo-item-clickable-area">
                     <b>${originalKey}</b>
+                    ${subTimeTagHtml}
                 </div>
                 <span class="sub-counter">
                     <button class="counter-btn minus-btn">-</button>
@@ -1068,25 +1078,10 @@ function renderSubWeightEditor(categoryKey, subItems) {
     });
 }
 
-// 加權／編輯按鈕的顏色跟著目前所在的大類別走：在分項頁（或該分項的加權頁）時，
-// 兩顆按鈕會變成該大類別本身的顏色，方便一眼看出目前是哪個大類別；在主頁（沒有單一大類別）時維持預設色。
-function syncActionButtonColors(weekData) {
-    const relevantKey = (currentView === 'sub')
-        ? currentSubKey
-        : (currentView === 'weight' && weightViewSourceView === 'sub') ? weightViewSourceSubKey : null;
-
-    const catColor = (relevantKey && weekData[relevantKey]) ? weekData[relevantKey].color : null;
-
-    if (openWeightViewBtn) openWeightViewBtn.style.backgroundColor = catColor || '#7c6bd6';
-    if (openEditModalBtn) openEditModalBtn.style.backgroundColor = catColor || '#ff9f43';
-}
-
 function updateView() {
     calculateMainItems(currentWeek);
     fullWeekData = weeklyDataStore[currentWeek];
     const weekData = getRegularOnlyWeekData(fullWeekData); // 主頁圖表/項目清單只看常規任務，臨時任務不計入總覽
-
-    syncActionButtonColors(weekData);
 
     if (currentView === 'weight') {
         // 加權比例調整頁：圓餅圖顯示「全部當作已完成」的樣子（沒有灰色未完成區塊），

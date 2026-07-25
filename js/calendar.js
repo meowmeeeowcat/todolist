@@ -174,6 +174,32 @@ function showDateDetails(dateStr, weekKey) {
         });
     }
 
+    html += `<h4 style="margin: 15px 0 5px 0; color: #1a4d6c;">當天計時紀錄：</h4>`;
+    const daySessions = (globalAppData.timelineSessions || [])
+        .filter(s => s.date === dateStr)
+        .sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
+
+    if (daySessions.length === 0) {
+        html += `<div class="detail-item" style="color:#777; font-style:italic;">當天尚無計時紀錄。</div>`;
+    } else {
+        let dayTotalMinutes = 0;
+        daySessions.forEach(s => {
+            dayTotalMinutes += s.durationMinutes || 0;
+            const startTotal = s.startMinutes || 0;
+            const endTotal = startTotal + (s.durationMinutes || 0);
+            const toClock = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+
+            html += `
+                <div class="detail-item detail-item-box" style="border-left:3px solid ${s.color || '#64748b'}">
+                    <b>${s.name}</b> <br>
+                    ${toClock(startTotal)} - ${toClock(endTotal)}（${s.durationMinutes} 分鐘）
+                </div>
+            `;
+        });
+        const dayTotalText = (typeof formatTimelineMinutes === 'function' && formatTimelineMinutes(dayTotalMinutes)) || `${dayTotalMinutes}分`;
+        html += `<div style="font-size:13px; color:#475569; margin: 4px 0 0 0;">當天累計：${dayTotalText}</div>`;
+    }
+
     html += `<h4 style="margin: 15px 0 5px 0; color: #1a4d6c;">所屬週次各大項累積進度：</h4>`;
     let hasRegular = false;
     for (let mainKey in weekData) {

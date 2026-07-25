@@ -215,6 +215,134 @@ function deleteTimelineSession(id) {
     renderWeeklyTimeline();
 }
 
+// ================= 手動記錄時間 =================
+// 跟番茄鐘計時器分開的另一種記錄方式：不用真的跑計時，直接選項目（或自訂一個項目清單裡沒有的名稱）
+// 加上起訖時間就能補記一筆。顏色預設跟著選到的大類別走，但使用者可以自己從馬卡龍色盤挑別的顏色。
+let manualLogSelectedColor = (window.fixedPalette && window.fixedPalette[0] && window.fixedPalette[0].color) || '#bae1ff';
+
+function renderManualLogCategorySelector() {
+    const catSel = document.getElementById('manual-log-category-select');
+    const subSel = document.getElementById('manual-log-subitem-select');
+    if (!catSel || !subSel) return;
+
+    const template = (window.globalAppData && window.globalAppData.template) || {};
+    const catKeys = Object.keys(template).filter(k => !template[k].archived);
+
+    catSel.innerHTML = `<option value="">— 不選分類，自訂項目 —</option>` + catKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+
+    function fillManualSubSelect() {
+        const catKey = catSel.value;
+        if (!catKey) {
+            subSel.innerHTML = `<option value="">（無）</option>`;
+            subSel.disabled = true;
+            return;
+        }
+        subSel.disabled = false;
+        const cat = template[catKey];
+        const subItems = (cat && cat.subItems) || {};
+        const subKeys = Object.keys(subItems).filter(k => !subItems[k].archived);
+        subSel.innerHTML = `<option value="">— 選擇分項 —</option>` + subKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+    }
+
+    // 選了大類別／分項時，自動幫忙帶入顯示名稱跟顏色（使用者之後還是可以自己改）
+    function autoFillFromSelection() {
+        const catKey = catSel.value;
+        const subKey = subSel.value;
+        const nameInput = document.getElementById('manual-log-name');
+        if (catKey && subKey && nameInput) {
+            nameInput.value = subKey;
+            manualLogSelectedColor = getSafeMacaronColor(catKey, '#bae1ff');
+            renderManualLogColorPalette();
+        }
+    }
+
+    fillManualSubSelect();
+    catSel.onchange = () => { fillManualSubSelect(); autoFillFromSelection(); };
+    subSel.onchange = autoFillFromSelection;
+}
+
+// 顏色選擇盤：跟主頁「新增全新類別」用的是同一套馬卡龍色盤（window.fixedPalette），畫法也比照那邊
+function renderManualLogColorPalette() {
+    const container = document.getElementById('manual-log-color-palette');
+    if (!container) return;
+    container.innerHTML = '';
+
+    (window.fixedPalette || []).forEach(item => {
+        const swatch = document.createElement('div');
+        swatch.className = 'timeline-color-swatch';
+        swatch.style.backgroundColor = item.color;
+        swatch.title = item.name;
+
+        if (item.color === manualLogSelectedColor) {
+            swatch.classList.add('is-selected');
+        }
+
+        swatch.addEventListener('click', () => {
+            manualLogSelectedColor = item.color;
+            renderManualLogColorPalette();
+        });
+
+        container.appendChild(swatch);
+    });
+}
+
+function timelineTimeStrToMinutes(hhmm) {
+    const parts = (hhmm || '').split(':');
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    return h * 60 + m;
+}
+
+function submitManualLogEntry() {
+    const dateInput = document.getElementById('manual-log-date');
+    const startInput = document.getElementById('manual-log-start-time');
+    const endInput = document.getElementById('manual-log-end-time');
+    const nameInput = document.getElementById('manual-log-name');
+    const catSel = document.getElementById('manual-log-category-select');
+    const subSel = document.getElementById('manual-log-subitem-select');
+
+    const dateStr = dateInput ? dateInput.value : '';
+    const startStr = startInput ? startInput.value : '';
+    const endStr = endInput ? endInput.value : '';
+    const name = (nameInput && nameInput.value || '').trim();
+
+    if (!dateStr || !startStr || !endStr) {
+        alert('請填寫日期、開始時間與結束時間');
+        return;
+    }
+    if (!name) {
+        alert('請輸入這筆紀錄要顯示的名稱');
+        return;
+    }
+
+    const startMinutes = timelineTimeStrToMinutes(startStr);
+    const endMinutes = timelineTimeStrToMinutes(endStr);
+    if (endMinutes <= startMinutes) {
+        alert('結束時間必須晚於開始時間（暫不支援跨過午夜的紀錄，請拆成兩筆分別記錄）');
+        return;
+    }
+
+    const session = {
+        id: 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        date: dateStr,
+        startMinutes: startMinutes,
+        durationMinutes: endMinutes - startMinutes,
+        categoryKey: (catSel && catSel.value) || '',
+        subKey: (subSel && subSel.value) || '',
+        name: name,
+        color: manualLogSelectedColor
+    };
+
+    if (!window.globalAppData.timelineSessions) window.globalAppData.timelineSessions = [];
+    window.globalAppData.timelineSessions.push(session);
+    saveTimelineSessions();
+    renderWeeklyTimeline();
+
+    // 保留日期跟項目選擇，方便使用者連續補記好幾筆同一天的紀錄，只清空時間欄位
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+}
+
 // ================= 每週時間線格線渲染 =================
 function goToPrevTimelineWeek() {
     timelineWeekStart = timelineAddDays(timelineWeekStart, -7);
@@ -312,14 +440,55 @@ function renderWeeklyTimeline() {
     });
 }
 
+// ================= 累計時間查詢工具（供 app.js 主頁清單、calendar.js 年曆頁使用） =================
+// 計算某個大類別（可選：某個分項）在指定週次裡，透過番茄鐘/手動記錄累計了多少分鐘
+function getTimelineMinutesForWeek(weekKey, categoryKey, subKey) {
+    const sessions = (window.globalAppData && window.globalAppData.timelineSessions) || [];
+    let total = 0;
+    sessions.forEach(s => {
+        if (s.categoryKey !== categoryKey) return;
+        if (subKey !== undefined && subKey !== null && s.subKey !== subKey) return;
+        if (getWeekNumberByDate(s.date) !== weekKey) return;
+        total += s.durationMinutes || 0;
+    });
+    return total;
+}
+
+// 把分鐘數格式化成「1小時23分」/「45分」這種好讀的顯示文字；0 分鐘回傳 null，方便呼叫端判斷要不要顯示這個標籤
+function formatTimelineMinutes(totalMinutes) {
+    if (!totalMinutes) return null;
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h > 0 && m > 0) return `${h}小時${m}分`;
+    if (h > 0) return `${h}小時`;
+    return `${m}分`;
+}
+
 // ================= 頁面進入點：每次切換到時間線頁都會呼叫一次（見 js/spa.js） =================
 function initTimelinePage() {
     if (!timelineWeekStart) timelineWeekStart = timelineGetSunday(new Date());
 
     renderTimelineItemSelectors();
     renderWeeklyTimeline();
-    timelineResetTimerToConfigured();
+
+    // 只有在目前「沒有進行中、也沒有暫停中」的計時時，才把倒數重置成輸入框設定的分鐘數；
+    // 如果計時正在跑、或是被暫停在中途，切換頁面離開再回來都不應該影響進度，直接顯示目前剩餘的時間就好。
+    if (!timerSessionStartedAt) {
+        timelineResetTimerToConfigured();
+    } else {
+        timelineUpdateTimerDisplay();
+    }
     timelineSyncTimerButtons();
+
+    // 手動記錄區塊：項目下拉選單、顏色盤每次進頁都重新整理一次（避免主頁那邊新增/刪除過分類後沒同步到）
+    renderManualLogCategorySelector();
+    renderManualLogColorPalette();
+    const manualDateInput = document.getElementById('manual-log-date');
+    if (manualDateInput && !manualDateInput.value) {
+        manualDateInput.value = timelineFormatDateStr(new Date());
+    }
+    const manualSubmitBtn = document.getElementById('manual-log-submit-btn');
+    if (manualSubmitBtn) manualSubmitBtn.onclick = submitManualLogEntry;
 
     // 用 onclick 覆蓋而不是 addEventListener 疊加，避免每次切回這一頁都重複綁定
     const prevBtn = document.getElementById('timeline-prev-week-btn');

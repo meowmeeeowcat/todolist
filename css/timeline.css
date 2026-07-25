@@ -82,6 +82,62 @@
     line-height: 1.6;
 }
 
+.timeline-subheading {
+    margin: 22px 0 12px 0;
+    font-size: 14px;
+    color: #1a4d6c;
+}
+
+.timeline-divider {
+    border: none;
+    border-top: 1px dashed #e2e8f0;
+    margin: 22px 0;
+}
+
+.timeline-manual-color-row {
+    align-items: center;
+    gap: 10px;
+}
+.timeline-manual-color-row label {
+    font-size: 13px;
+    color: #475569;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.timeline-color-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.timeline-color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    box-sizing: border-box;
+    border: 1px solid rgba(0,0,0,0.15);
+    transition: all 0.15s ease;
+}
+.timeline-color-swatch.is-selected {
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #2c3e50;
+    transform: scale(1.15);
+}
+
+.timeline-left input[type="date"],
+.timeline-left input[type="time"] {
+    flex: 1;
+    min-width: 0;
+    padding: 8px;
+}
+
+.timeline-time-sep {
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
 /* ================= 右側：仿 Google 日曆的週視圖 ================= */
 .timeline-right {
     flex-grow: 1;
