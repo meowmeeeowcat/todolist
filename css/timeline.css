@@ -155,12 +155,8 @@
 
 .timeline-grid-header {
     display: grid;
-    grid-template-columns: 52px repeat(7, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     border-bottom: 2px solid #e2e8f0;
-}
-
-.timeline-gutter-spacer {
-    /* 對齊左側時間刻度欄的空白格 */
 }
 
 .timeline-day-header {
@@ -168,6 +164,9 @@
     padding: 6px 0 10px 0;
     color: #64748b;
     border-left: 1px solid #f1f5f9;
+}
+.timeline-day-header:first-child {
+    border-left: none;
 }
 
 .timeline-day-name {
@@ -201,60 +200,61 @@
 
 .timeline-grid-body {
     display: grid;
-    grid-template-columns: 52px repeat(7, 1fr);
-    position: relative;
+    grid-template-columns: repeat(7, 1fr);
+    align-items: start;
 }
 
-.timeline-time-gutter {
+/* 每天一欄，裡面的紀錄卡片依開始時間先後由上往下堆疊，沒有小時格線、也不是照時長比例畫的 */
+.timeline-day-column {
+    border-left: 1px solid #f1f5f9;
+    padding: 8px 6px;
     display: flex;
     flex-direction: column;
+    gap: 6px;
+    min-height: 90px;
 }
-
-.timeline-hour-label {
-    font-size: 11px;
-    color: #94a3b8;
-    text-align: right;
-    padding-right: 6px;
-    box-sizing: border-box;
-    transform: translateY(-7px);
-}
-
-.timeline-day-column {
-    position: relative;
-    border-left: 1px solid #f1f5f9;
-    background-image: repeating-linear-gradient(to bottom, #f1f5f9 0, #f1f5f9 1px, transparent 1px, transparent 100%);
-    background-repeat: repeat-y;
+.timeline-day-column:first-child {
+    border-left: none;
 }
 
 .timeline-day-column.is-today {
     background-color: #f0fbfd;
 }
 
+.timeline-empty-day-hint {
+    color: #cbd5e1;
+    font-size: 12px;
+    text-align: center;
+    padding-top: 24px;
+    font-style: italic;
+}
+
 .timeline-block {
-    position: absolute;
-    left: 3px;
-    right: 3px;
     border-radius: 6px;
-    padding: 3px 6px;
-    overflow: hidden;
+    padding: 6px 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     font-size: 12px;
     color: #1a4d6c;
+    position: relative;
+}
+
+.timeline-block-time {
+    font-size: 10px;
     font-weight: bold;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 4px;
-    cursor: default;
+    opacity: 0.75;
 }
 
 .timeline-block-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-weight: bold;
+    margin-top: 2px;
+    overflow-wrap: break-word;
+    padding-right: 16px; /* 留空間給右上角的刪除鈕，避免文字太長時被蓋住 */
 }
 
 .timeline-block-delete {
+    position: absolute;
+    top: 4px;
+    right: 4px;
     background: rgba(255,255,255,0.7);
     color: #475569;
     border: none;
@@ -290,11 +290,11 @@
     }
 
     .timeline-grid-header {
-        grid-template-columns: 40px repeat(7, minmax(46px, 1fr));
+        grid-template-columns: repeat(7, minmax(72px, 1fr));
         overflow-x: auto;
     }
     .timeline-grid-body {
-        grid-template-columns: 40px repeat(7, minmax(46px, 1fr));
+        grid-template-columns: repeat(7, minmax(72px, 1fr));
     }
 
     .timeline-grid-scroll {

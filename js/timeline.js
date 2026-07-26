@@ -1,7 +1,8 @@
 // js/timeline.js
 // ================= 每日時間線（含番茄鐘計時器） =================
-// 左側：選擇要計時的項目（常規任務的大類別＋分項）+ 番茄鐘計時器。
-// 右側：仿 Google 日曆的週視圖，從早上 6 點畫到晚上 12 點，計時完成的紀錄會變成一個個色塊畫在對應的時間格上。
+// 左側：選擇要計時的項目（常規任務的大類別＋分項）+ 番茄鐘計時器 + 手動記錄時間。
+// 右側：一週 7 天（週一為第一天）並排顯示，每天欄位裡把當天做過的事情依開始時間先後依序堆疊成一張張色塊卡片，
+// 不畫小時格線，每張卡片直接顯示「開始～結束」時間，卡片高度依內容自然撐開，不是照時長比例畫的時間軸。
 // 資料存在 globalAppData.timelineSessions（陣列），寫回 Firebase 時轉成用 id 當 key 的物件（跟 tempTasks 做法一致，
 // 相關的轉換函式 timelineSessionsArrayToObject / timelineSessionsObjectToArray 寫在 js/data.js）。
 //
@@ -10,12 +11,9 @@
 // - window.globalAppData：來自 js/data.js
 // - saveTimelineSessions()：來自 js/app.js
 
-const TIMELINE_START_HOUR = 6;   // 時間線最早顯示到早上 6 點
-const TIMELINE_END_HOUR = 24;    // 顯示到晚上 12 點（24:00）
-const TIMELINE_HOUR_HEIGHT = 48; // 每小時的格子高度（px）
-const timelineWeekdayNames = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"];
+const timelineWeekdayNames = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"];
 
-let timelineWeekStart = null;      // 目前顯示的那一週，週日當天 00:00 的 Date
+let timelineWeekStart = null;      // 目前顯示的那一週，週一當天 00:00 的 Date
 let timerTotalSeconds = 25 * 60;   // 這次計時總共設定幾秒
 let timerRemainingSeconds = 25 * 60; // 倒數剩餘秒數
 let timerIntervalId = null;        // setInterval 的 id，用來停止倒數
@@ -30,10 +28,13 @@ function timelineFormatDateStr(d) {
     return `${yyyy}-${mm}-${dd}`;
 }
 
-function timelineGetSunday(d) {
+// 取得「這一週的週一」：JS 的 getDay() 是週日=0～週六=6，這裡換算成週一為一週的開始
+function timelineGetMonday(d) {
     const copy = new Date(d);
     copy.setHours(0, 0, 0, 0);
-    copy.setDate(copy.getDate() - copy.getDay());
+    const day = copy.getDay();
+    const diffToMonday = (day === 0) ? -6 : (1 - day);
+    copy.setDate(copy.getDate() + diffToMonday);
     return copy;
 }
 
@@ -355,7 +356,7 @@ function goToNextTimelineWeek() {
 }
 
 function goToTodayTimelineWeek() {
-    timelineWeekStart = timelineGetSunday(new Date());
+    timelineWeekStart = timelineGetMonday(new Date());
     renderWeeklyTimeline();
 }
 
@@ -375,60 +376,56 @@ function renderWeeklyTimeline() {
         labelEl.innerText = `${fmt(first)} - ${fmt(last)}`;
     }
 
-    // 表頭：週日～週六的日期
-    headerEl.innerHTML = `<div class="timeline-gutter-spacer"></div>` + weekDates.map(d => {
+    // 表頭：週一～週日的日期（沒有時間刻度欄，7 天平分寬度）
+    headerEl.innerHTML = weekDates.map(d => {
         const dStr = timelineFormatDateStr(d);
         const isToday = dStr === todayStr;
         return `
             <div class="timeline-day-header ${isToday ? 'is-today' : ''}">
-                <div class="timeline-day-name">${timelineWeekdayNames[d.getDay()]}</div>
+                <div class="timeline-day-name">${timelineWeekdayNames[(d.getDay() + 6) % 7]}</div>
                 <div class="timeline-day-num">${d.getDate()}</div>
             </div>
         `;
     }).join('');
 
-    // 左側時間刻度
-    let gutterHtml = '<div class="timeline-time-gutter">';
-    for (let h = TIMELINE_START_HOUR; h < TIMELINE_END_HOUR; h++) {
-        gutterHtml += `<div class="timeline-hour-label" style="height:${TIMELINE_HOUR_HEIGHT}px;">${h}:00</div>`;
-    }
-    gutterHtml += '</div>';
-
-    const totalHeight = (TIMELINE_END_HOUR - TIMELINE_START_HOUR) * TIMELINE_HOUR_HEIGHT;
     const allSessions = window.globalAppData.timelineSessions || [];
 
+    // 每天欄位：把當天的紀錄依開始時間排序，一張一張卡片往下疊，不畫小時格線、不用比例定位
     let daysHtml = '';
     weekDates.forEach(d => {
         const dStr = timelineFormatDateStr(d);
         const isToday = dStr === todayStr;
-        const daySessions = allSessions.filter(s => s.date === dStr);
+        const daySessions = allSessions
+            .filter(s => s.date === dStr)
+            .sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
 
         let blocksHtml = '';
-        daySessions.forEach(s => {
-            const startOffsetMin = (s.startMinutes || 0) - TIMELINE_START_HOUR * 60;
-            const top = (startOffsetMin / 60) * TIMELINE_HOUR_HEIGHT;
-            if (top >= totalHeight) return; // 超出顯示範圍（例如半夜的紀錄）就不畫，避免跑版
-            const height = Math.max((s.durationMinutes / 60) * TIMELINE_HOUR_HEIGHT, 16);
+        if (daySessions.length === 0) {
+            blocksHtml = `<div class="timeline-empty-day-hint">尚無紀錄</div>`;
+        } else {
+            daySessions.forEach(s => {
+                const startTotal = s.startMinutes || 0;
+                const endTotal = startTotal + (s.durationMinutes || 0);
+                const toClock = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 
-            blocksHtml += `
-                <div class="timeline-block" title="${s.name}（${s.durationMinutes} 分鐘）"
-                     style="top:${Math.max(top, 0)}px; height:${height}px; background-color:${s.color};">
-                    <span class="timeline-block-text">${s.name}・${s.durationMinutes}分</span>
-                    <button class="timeline-block-delete" data-id="${s.id}" title="刪除這筆紀錄">&times;</button>
-                </div>
-            `;
-        });
+                blocksHtml += `
+                    <div class="timeline-block" style="background-color:${s.color};" title="${s.name}（${s.durationMinutes} 分鐘）">
+                        <div class="timeline-block-time">${toClock(startTotal)} - ${toClock(endTotal)}</div>
+                        <div class="timeline-block-text">${s.name}</div>
+                        <button class="timeline-block-delete" data-id="${s.id}" title="刪除這筆紀錄">&times;</button>
+                    </div>
+                `;
+            });
+        }
 
         daysHtml += `
-            <div class="timeline-day-column ${isToday ? 'is-today' : ''}"
-                 style="height:${totalHeight}px; background-size: 100% ${TIMELINE_HOUR_HEIGHT}px;">
+            <div class="timeline-day-column ${isToday ? 'is-today' : ''}">
                 ${blocksHtml}
             </div>
         `;
     });
 
-    bodyEl.innerHTML = gutterHtml + daysHtml;
-    bodyEl.style.height = totalHeight + 'px';
+    bodyEl.innerHTML = daysHtml;
 
     bodyEl.querySelectorAll('.timeline-block-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -466,7 +463,7 @@ function formatTimelineMinutes(totalMinutes) {
 
 // ================= 頁面進入點：每次切換到時間線頁都會呼叫一次（見 js/spa.js） =================
 function initTimelinePage() {
-    if (!timelineWeekStart) timelineWeekStart = timelineGetSunday(new Date());
+    if (!timelineWeekStart) timelineWeekStart = timelineGetMonday(new Date());
 
     renderTimelineItemSelectors();
     renderWeeklyTimeline();

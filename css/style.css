@@ -299,6 +299,7 @@ select:focus, input:focus {
     border-radius: 4px;
     font-weight: bold;
     white-space: nowrap;
+    margin-left: 8px;
 }
 
 .todo-list-wrapper.editing-mode .todo-item-progress-tag,
@@ -506,7 +507,7 @@ button:hover {
 /* 加權／編輯按鈕固定使用馬卡龍色盤裡的顏色，跟主頁「新增全新類別」時可選的顏色是同一套色盤 */
 .macaron-btn-red {
     background-color: #ffb3ba;
-    color: #7a2e35;
+    color: white;
 }
 .macaron-btn-red:hover {
     background-color: #ff9aa4;
@@ -514,7 +515,7 @@ button:hover {
 
 .macaron-btn-navy {
     background-color: #c5cbff;
-    color: #2d3374;
+    color: white;
 }
 .macaron-btn-navy:hover {
     background-color: #aab0f5;
@@ -820,6 +821,11 @@ button:hover {
     .left-column {
         width: 100%;
         order: 1;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: white;
+        padding-bottom: 8px;
     }
     .mobile-list-tabs {
         order: 2;

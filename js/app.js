@@ -476,8 +476,8 @@ function renderTodoList(weekData) {
                 <div class="todo-item-clickable-area">
                     <span class="todo-item-progress-tag">${item.completed} / ${item.total}</span>
                     <b>${key}</b>
-                    ${catTimeTagHtml}
                 </div>
+                ${catTimeTagHtml}
                 <span class="actions">
                     <button class="move-btn move-up-btn" title="往上移" ${index === 0 ? 'disabled' : ''}>▲</button>
                     <button class="move-btn move-down-btn" title="往下移" ${index === orderedKeys.length - 1 ? 'disabled' : ''}>▼</button>
@@ -590,8 +590,8 @@ function renderTodoList(weekData) {
             li.innerHTML = `
                 <div class="todo-item-clickable-area">
                     <b>${originalKey}</b>
-                    ${subTimeTagHtml}
                 </div>
+                ${subTimeTagHtml}
                 <span class="sub-counter">
                     <button class="counter-btn minus-btn">-</button>
                     <span>${subItem.completed} / ${subItem.total}</span>
@@ -884,15 +884,14 @@ if (tempHistoryModal) {
 
 // 手機版：在「項目清單」跟「代辦清單（臨時任務）」之間切換
 function switchMobileListTab(tab) {
-    const leftColumnEl = document.querySelector('.left-column');
     const todoWrapperEl = document.getElementById('todo-list-wrapper');
     const tempWrapperEl = document.getElementById('temp-task-list-wrapper');
     const mainTabBtn = document.getElementById('mobile-tab-main');
     const tempTabBtn = document.getElementById('mobile-tab-temp');
-    if (!leftColumnEl || !todoWrapperEl || !tempWrapperEl) return;
+    if (!todoWrapperEl || !tempWrapperEl) return;
 
     const showTemp = (tab === 'temp');
-    leftColumnEl.classList.toggle('mobile-tab-hidden', showTemp);
+    // 圓餅圖（.left-column）不受這個切換影響，一直固定顯示在畫面最上方，只切換下面的清單本體
     todoWrapperEl.classList.toggle('mobile-tab-hidden', showTemp);
     tempWrapperEl.classList.toggle('mobile-tab-hidden', !showTemp);
     if (mainTabBtn) mainTabBtn.classList.toggle('active', !showTemp);
@@ -971,7 +970,7 @@ function getFullCompletionChartData(weekData) {
         const weightedTotal = subWeighted.total * catWeight;
         fakeData[key] = { ...item, completed: weightedTotal, total: weightedTotal };
     }
-    return getChartData(fakeData, false);
+    return getChartData(fakeData, false, weekData);
 }
 
 // 分項版的加權比例調整頁專用：邏輯同上，但只針對「某一個大類別底下的分項」，
@@ -984,7 +983,7 @@ function getFullCompletionChartDataForSub(subItems, categoryKey) {
         const weightedTotal = (item.total || 0) * weight;
         fakeData[subKey] = { ...item, completed: weightedTotal, total: weightedTotal };
     }
-    return getChartData(fakeData, true);
+    return getChartData(fakeData, true, subItems);
 }
 
 // 加權比例調整頁：輸入數字當下只重畫圓餅圖預覽（不重繪整份清單，避免每打一個字輸入框就失焦），
@@ -1105,7 +1104,7 @@ function updateView() {
         chartTitleTextEl.innerText = currentWeek + " - 必做事項總覽";
         openWeightViewBtn.innerText = "加權";
 
-        const mainChartData = getChartData(applyMainWeights(weekData), false);
+        const mainChartData = getChartData(applyMainWeights(weekData), false, weekData);
         renderPieChart('todoChart', mainChartData, (clickedIndex) => {
             if (todoListWrapper.classList.contains('editing-mode')) return;
             const label = mainChartData.labels[clickedIndex];
@@ -1125,7 +1124,7 @@ function updateView() {
         openWeightViewBtn.innerText = "加權";
 
         const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
-        const subChartData = getChartData(applySubWeights(subItems, currentSubKey), true);
+        const subChartData = getChartData(applySubWeights(subItems, currentSubKey), true, subItems);
         renderPieChart('todoChart', subChartData, null);
         renderTodoList(weekData);
     }
