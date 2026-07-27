@@ -637,7 +637,9 @@ function renderTodoList(weekData) {
 
             li.querySelector('.plus-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (subItem.completed < subItem.total) {
+                // 打卡上限放寬到規定次數的 3 倍：做滿原本規定的次數是第一層，
+                // 想繼續多做同一件事，可以一直打到 3 倍上限，多出來的部分會累積成主頁圓餅圖的第二、三層。
+                if (subItem.completed < subItem.total * 3) {
                     if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
                     if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
                     globalAppData.progress[currentWeek][originalKey]++;
@@ -1077,6 +1079,28 @@ function renderSubWeightEditor(categoryKey, subItems) {
     });
 }
 
+// 顯示目前圓餅圖解鎖到第幾層的狀態提示：
+// - 完全沒解鎖（第一層還沒蓋滿）：不顯示提示，保持畫面單純
+// - 第一層蓋滿、第二層還沒蓋滿：提示使用者開始累積第二層
+// - 第二層也蓋滿了：提示第三層加碼中
+// layeredData 傳 null 代表這個畫面（例如加權比例調整頁）不適用三層機制，直接清空提示文字
+function updateChartLayerHint(layeredData) {
+    const hintEl = document.getElementById('chart-layer-hint');
+    if (!hintEl) return;
+
+    if (!layeredData) {
+        hintEl.innerText = '';
+        return;
+    }
+    if (layeredData.layer2Complete) {
+        hintEl.innerText = '🏆 第二層也蓋滿了，第三層加碼中！';
+    } else if (layeredData.layer1Complete) {
+        hintEl.innerText = '✨ 原定項目都做完了，多做的次數開始累積第二層！';
+    } else {
+        hintEl.innerText = '';
+    }
+}
+
 function updateView() {
     calculateMainItems(currentWeek);
     fullWeekData = weeklyDataStore[currentWeek];
@@ -1093,18 +1117,20 @@ function updateView() {
             const subItems = weekData[weightViewSourceSubKey] ? weekData[weightViewSourceSubKey].subItems : {};
             const fullSubChartData = getFullCompletionChartDataForSub(subItems, weightViewSourceSubKey);
             renderPieChart('todoChart', fullSubChartData, null);
+            updateChartLayerHint(null);
             renderSubWeightEditor(weightViewSourceSubKey, subItems);
         } else {
             chartTitleTextEl.innerText = "加權比例調整";
             const fullChartData = getFullCompletionChartData(weekData);
             renderPieChart('todoChart', fullChartData, null);
+            updateChartLayerHint(null);
             renderWeightEditor(weekData);
         }
     } else if (currentView === 'main') {
         chartTitleTextEl.innerText = currentWeek + " - 必做事項總覽";
         openWeightViewBtn.innerText = "加權";
 
-        const mainChartData = getChartData(applyMainWeights(weekData), false, weekData);
+        const mainChartData = getLayeredChartData(applyMainWeights(weekData), weekData);
         renderPieChart('todoChart', mainChartData, (clickedIndex) => {
             if (todoListWrapper.classList.contains('editing-mode')) return;
             const label = mainChartData.labels[clickedIndex];
@@ -1118,14 +1144,16 @@ function updateView() {
                 updateView();
             }
         });
+        updateChartLayerHint(mainChartData);
         renderTodoList(weekData);
     } else {
         chartTitleTextEl.innerText = currentSubKey + " - 分項進度";
         openWeightViewBtn.innerText = "加權";
 
         const subItems = weekData[currentSubKey] ? weekData[currentSubKey].subItems : {};
-        const subChartData = getChartData(applySubWeights(subItems, currentSubKey), true, subItems);
+        const subChartData = getLayeredChartData(applySubWeights(subItems, currentSubKey), subItems);
         renderPieChart('todoChart', subChartData, null);
+        updateChartLayerHint(subChartData);
         renderTodoList(weekData);
     }
 
