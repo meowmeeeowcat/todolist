@@ -193,10 +193,16 @@ function logTimelineSession(startDate, endDate) {
 
     const durationMinutes = Math.max(1, Math.round((endDate - startDate) / 60000));
 
+    // 凌晨 4 點才算新的一天：凌晨 0:00~3:59 開始的紀錄，實際上要算在「前一天」的延伸時段
+    // （用 24:00~27:59 表示，這樣才能跟同一個有效日裡其他紀錄正確依照真實發生的先後順序排序、堆疊）
+    const effectiveDate = getEffectiveDateForTimestamp(startDate);
+    let startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+    if (startDate.getHours() < 4) startMinutes += 24 * 60;
+
     const session = {
         id: 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        date: timelineFormatDateStr(startDate),
-        startMinutes: startDate.getHours() * 60 + startDate.getMinutes(),
+        date: timelineFormatDateStr(effectiveDate),
+        startMinutes: startMinutes,
         durationMinutes: durationMinutes,
         categoryKey: categoryKey,
         subKey: subKey,
@@ -316,8 +322,12 @@ function submitManualLogEntry() {
         return;
     }
 
-    const startMinutes = timelineTimeStrToMinutes(startStr);
-    const endMinutes = timelineTimeStrToMinutes(endStr);
+    // 凌晨 0:00~3:59 的時間，視為前一個「有效日」的延伸時段（用 24:00~27:59 表示），
+    // 這樣同一天（使用者選的那個日期）裡，跨過凌晨的紀錄還是能依照真實先後順序正確排序、堆疊
+    let startMinutes = timelineTimeStrToMinutes(startStr);
+    let endMinutes = timelineTimeStrToMinutes(endStr);
+    if (startMinutes < 4 * 60) startMinutes += 24 * 60;
+    if (endMinutes < 4 * 60) endMinutes += 24 * 60;
     if (endMinutes <= startMinutes) {
         alert('結束時間必須晚於開始時間（暫不支援跨過午夜的紀錄，請拆成兩筆分別記錄）');
         return;
@@ -356,7 +366,7 @@ function goToNextTimelineWeek() {
 }
 
 function goToTodayTimelineWeek() {
-    timelineWeekStart = timelineGetMonday(new Date());
+    timelineWeekStart = timelineGetMonday(getEffectiveNow());
     renderWeeklyTimeline();
 }
 
@@ -366,7 +376,7 @@ function renderWeeklyTimeline() {
     const labelEl = document.getElementById('timeline-week-label');
     if (!headerEl || !bodyEl) return;
 
-    const todayStr = timelineFormatDateStr(new Date());
+    const todayStr = timelineFormatDateStr(getEffectiveNow());
     const weekDates = [];
     for (let i = 0; i < 7; i++) weekDates.push(timelineAddDays(timelineWeekStart, i));
 
@@ -406,7 +416,10 @@ function renderWeeklyTimeline() {
             daySessions.forEach(s => {
                 const startTotal = s.startMinutes || 0;
                 const endTotal = startTotal + (s.durationMinutes || 0);
-                const toClock = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+                const toClock = (mins) => {
+                    const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+                    return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+                };
 
                 blocksHtml += `
                     <div class="timeline-block" style="background-color:${s.color};" title="${s.name}（${s.durationMinutes} 分鐘）">
@@ -463,7 +476,7 @@ function formatTimelineMinutes(totalMinutes) {
 
 // ================= 頁面進入點：每次切換到時間線頁都會呼叫一次（見 js/spa.js） =================
 function initTimelinePage() {
-    if (!timelineWeekStart) timelineWeekStart = timelineGetMonday(new Date());
+    if (!timelineWeekStart) timelineWeekStart = timelineGetMonday(getEffectiveNow());
 
     renderTimelineItemSelectors();
     renderWeeklyTimeline();
@@ -482,7 +495,7 @@ function initTimelinePage() {
     renderManualLogColorPalette();
     const manualDateInput = document.getElementById('manual-log-date');
     if (manualDateInput && !manualDateInput.value) {
-        manualDateInput.value = timelineFormatDateStr(new Date());
+        manualDateInput.value = timelineFormatDateStr(getEffectiveNow());
     }
     const manualSubmitBtn = document.getElementById('manual-log-submit-btn');
     if (manualSubmitBtn) manualSubmitBtn.onclick = submitManualLogEntry;

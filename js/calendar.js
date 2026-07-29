@@ -187,7 +187,10 @@ function showDateDetails(dateStr, weekKey) {
             dayTotalMinutes += s.durationMinutes || 0;
             const startTotal = s.startMinutes || 0;
             const endTotal = startTotal + (s.durationMinutes || 0);
-            const toClock = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+            const toClock = (mins) => {
+                const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+                return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+            };
 
             html += `
                 <div class="detail-item detail-item-box" style="border-left:3px solid ${s.color || '#64748b'}">
@@ -269,7 +272,8 @@ function calculateAnnualSummaryStats() {
 // 每次切換到年曆頁時執行，讀取當下已經在記憶體裡的 globalAppData。
 
 function initCalendarGrid() {
-    const systemDate = new Date();
+    // 「今天」是凌晨 4 點重置後的有效日期，不是單純的日曆日期（凌晨 0～3 點還算前一天）
+    const systemDate = getEffectiveNow();
     let todayStr = "2026-07-11"; 
     let systemWeekKey = "第 28 週";
     let todayMonthIndex = 6; // 對應預設的 2026-07-11（7月，索引 6）

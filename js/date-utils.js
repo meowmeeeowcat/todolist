@@ -42,3 +42,22 @@ function compareWeeks(w1, w2) {
     const num2 = parseInt(w2.replace(/[^0-9]/g, ''), 10);
     return num1 - num2;
 }
+
+// ================= 每天/每週的「重置時間」是凌晨 4 點 =================
+// 凌晨 0:00～3:59 都還算是「前一天」，滿 4:00 才算真正進入新的一天（連帶影響新的一週從第幾天算起）。
+// 全站只要是「現在是哪一天/哪一週」的判斷，都應該透過下面這兩個函式，不要直接用 new Date() 的日曆日期，
+// 否則凌晨 0～3 點會被誤判成已經是隔天/下一週。
+// - getEffectiveDateForTimestamp(d)：給一個實際時間點，回傳它「有效」對應到的日期（時分秒歸零）
+// - getEffectiveNow()：現在這一刻對應到的有效日期，最常用（例如判斷今天是幾號、今天屬於第幾週）
+function getEffectiveDateForTimestamp(d) {
+    const effective = new Date(d);
+    if (effective.getHours() < 4) {
+        effective.setDate(effective.getDate() - 1);
+    }
+    effective.setHours(0, 0, 0, 0);
+    return effective;
+}
+
+function getEffectiveNow() {
+    return getEffectiveDateForTimestamp(new Date());
+}
