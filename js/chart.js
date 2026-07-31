@@ -2,35 +2,15 @@
 
 let currentChartInstance = null;
 
-// ================= 單層圖表用的 tooltip（沿用給加權比例調整頁的預覽圖表） =================
-// 優先顯示 rawValues（原始未加權次數），沒有的話才退回用切片本身的數值
-function buildTimelineTooltipLabel(chartData) {
-    return function (context) {
-        const idx = context.dataIndex;
-        const label = context.label || '';
-        const raw = (chartData.rawValues && chartData.rawValues[idx] !== undefined)
-            ? chartData.rawValues[idx]
-            : context.parsed;
-        return `${label}: ${raw}`;
-    };
-}
-
 // ================= 三層加碼圖表用的 tooltip =================
-// 要先知道滑鼠移到的是「哪一圈」（context.datasetIndex：0=第一層 1=第二層 2=第三層），
-// 再從那一圈自己的 rawLayerNValues 裡面找出對應的原始（未加權）次數
+// 鼠標移到圓餅圖（不管是哪一圈）上面，顯示的都是該項目「目前的百分比」（用原始未加權次數算出來的真實進度），
+// 不受加權影響，也不會因為在哪一層而不同──都是同一個真實進度。
 function buildLayeredTooltipLabel(layeredData) {
-    const layerSuffix = ['', '（第二層・超額加碼）', '（第三層・超額加碼）'];
-    const rawByDataset = [layeredData.rawLayer1Values, layeredData.rawLayer2Values, layeredData.rawLayer3Values];
     return function (context) {
         const idx = context.dataIndex;
-        const datasetIdx = context.datasetIndex;
         const label = layeredData.labels[idx] || '';
-        const rawArr = rawByDataset[datasetIdx] || [];
-        const raw = (rawArr[idx] !== undefined) ? rawArr[idx] : context.parsed;
-        if (label === '未完成任務' || label === '尚無資料') {
-            return `${label}: ${raw}`;
-        }
-        return `${label}${layerSuffix[datasetIdx] || ''}: ${raw}`;
+        const percent = (layeredData.percents && layeredData.percents[idx] !== undefined) ? layeredData.percents[idx] : Math.round(context.parsed);
+        return `${label}: ${percent}%`;
     };
 }
 
@@ -52,7 +32,8 @@ function renderPieChart(canvasId, layeredDataInput, onClickCallback) {
         layer3Values: layeredDataInput.labels.map(() => 0),
         rawLayer1Values: layeredDataInput.rawValues || layeredDataInput.dataValues,
         rawLayer2Values: layeredDataInput.labels.map(() => 0),
-        rawLayer3Values: layeredDataInput.labels.map(() => 0)
+        rawLayer3Values: layeredDataInput.labels.map(() => 0),
+        percents: layeredDataInput.labels.map(() => 0)
     };
 
     const datasetsConfig = [
@@ -177,27 +158,22 @@ function getChartData(dataObj, isSub, rawDataObj) {
 // rawDataObj：對應的原始（未加權）completed/total（用來判斷有沒有解鎖下一層、以及 tooltip 顯示的次數）
 //
 // 機制：
-// - 第一層＝原本規定的次數（每個項目最多到自己的 total）。
-// - 使用者可以繼續打卡超過 total，最多到 total*3（上限在 app.js 的打卡按鈕那邊控制）。
-// - 「解鎖」的判斷用全體原始次數的總和：要整體（不是單一項目）把第一層全部蓋滿，第二層才會被畫出來；
-//   同理，把第二層也整體蓋滿，第三層才會被畫出來。還沒解鎖的層，資料一律是 0（那一圈就是空的）。
-// 第二層的視覺上限：就算做到 2 倍以上，第二層那一圈最多也只會畫到「總容量 × 這個比例」，
-// 刻意不讓第二層整圈填滿，用來跟「第三層可以整圈填滿」做出區隔。
-const LAYER2_MAX_FRACTION = 0.9;
-
 // dataObj：可能已經套用過「加權」倍數的 completed/total（用來決定畫面上切片的視覺比例）
-// rawDataObj：對應的原始（未加權）completed/total（只用來讓 tooltip 顯示原始次數，不影響畫面比例）
+// rawDataObj：對應的原始（未加權）completed/total（用來判斷有沒有解鎖下一層、以及 tooltip 顯示的百分比）
 //
-// 機制（每個項目各自獨立累積，沒有次數上限，也不需要「全部項目都做滿」才能開始累積下一層）：
-// - 第一層：0～1 倍，跟以前一樣的 0-100%，超過規定次數的部分不會讓第一層超過 100%。
-// - 第二層：1～2 倍區間的累積量，視覺上限縮到 LAYER2_MAX_FRACTION（做到 2 倍時，第二層剛好畫到這個上限，不會整圈填滿）。
-// - 第三層：2～3 倍區間的累積量，做到 3 倍時剛好整圈畫滿（100%）。
+// 機制：
+// - 第一層＝原本規定的次數（0～1 倍），跟以前一樣的 0-100%。
+// - 第二層：要整體（所有項目加總）把第一層完全填滿，才會開始出現；出現後不是直接填滿，
+//   而是跟第一層一樣，依照實際累積的量（1～2 倍區間）逐步填滿。
+// - 第三層：要整體把第二層也完全填滿，才會開始出現，邏輯同上（2～3 倍區間）。
+// - 解鎖判斷一律用「原始（未加權）次數」計算，確保不會因為加權而變得比較容易或比較難解鎖。
 function getLayeredChartData(dataObj, rawDataObj) {
     const labels = [];
     const colors = [];
     const l1Vals = [], l2Vals = [], l3Vals = [];
     const rawL1 = [], rawL2 = [], rawL3 = [];
-    let totalAllWeighted = 0;
+    let totalAllWeighted = 0, totalAllRaw = 0;
+    let layer1SumRaw = 0, layer2SumRaw = 0;
 
     for (let key in dataObj) {
         const item = dataObj[key];
@@ -211,35 +187,49 @@ function getLayeredChartData(dataObj, rawDataObj) {
         colors.push(item.color || '#bae1ff');
 
         l1Vals.push(Math.min(completed, total));
-        l2Vals.push(Math.min(Math.max(completed - total, 0), total) * LAYER2_MAX_FRACTION);
+        l2Vals.push(Math.min(Math.max(completed - total, 0), total));
         l3Vals.push(Math.min(Math.max(completed - total * 2, 0), total));
 
-        rawL1.push(Math.min(rawCompleted, rawTotal));
-        rawL2.push(Math.min(Math.max(rawCompleted - rawTotal, 0), rawTotal));
-        rawL3.push(Math.min(Math.max(rawCompleted - rawTotal * 2, 0), rawTotal));
+        const rl1 = Math.min(rawCompleted, rawTotal);
+        const rl2 = Math.min(Math.max(rawCompleted - rawTotal, 0), rawTotal);
+        const rl3 = Math.min(Math.max(rawCompleted - rawTotal * 2, 0), rawTotal);
+        rawL1.push(rl1);
+        rawL2.push(rl2);
+        rawL3.push(rl3);
 
         totalAllWeighted += total;
+        totalAllRaw += rawTotal;
+        layer1SumRaw += rl1;
+        layer2SumRaw += rl2;
     }
+
+    const layer1Complete = totalAllRaw > 0 && layer1SumRaw >= totalAllRaw;
+    const layer2Complete = totalAllRaw > 0 && layer2SumRaw >= totalAllRaw;
 
     const finalLabels = [...labels];
     const finalColors = [...colors];
     const finalL1 = [...l1Vals];
-    const finalL2 = [...l2Vals];
-    const finalL3 = [...l3Vals];
+    const finalL2 = layer1Complete ? [...l2Vals] : labels.map(() => 0);
+    const finalL3 = layer2Complete ? [...l3Vals] : labels.map(() => 0);
     const finalRawL1 = [...rawL1];
-    const finalRawL2 = [...rawL2];
-    const finalRawL3 = [...rawL3];
+    const finalRawL2 = layer1Complete ? [...rawL2] : labels.map(() => 0);
+    const finalRawL3 = layer2Complete ? [...rawL3] : labels.map(() => 0);
+
+    // 每個項目「目前的百分比」：一律用原始次數計算，跟目前是第幾層無關，讓使用者看到的是真實進度
+    // （超過 100% 也照實顯示，例如做到 2.3 倍就顯示 230%）
+    const percents = labels.map((key, idx) => {
+        const rawItem = (rawDataObj && rawDataObj[key]) || dataObj[key];
+        const rawTotal = rawItem.total || 0;
+        const rawCompleted = rawItem.completed || 0;
+        return rawTotal > 0 ? Math.round((rawCompleted / rawTotal) * 100) : 0;
+    });
 
     // 第一層補上跟原本單層圖表一樣的「未完成任務」灰色區塊／「尚無資料」佔位
     const layer1SumWeighted = finalL1.reduce((a, b) => a + b, 0);
-    const layer1SumRaw = finalRawL1.reduce((a, b) => a + b, 0);
-    let totalAllRaw = 0;
-    for (let key in dataObj) {
-        const rawItem = (rawDataObj && rawDataObj[key]) || dataObj[key];
-        totalAllRaw += rawItem.total || 0;
-    }
     const remainingWeighted = Math.max(totalAllWeighted - layer1SumWeighted, 0);
     const remainingRaw = Math.max(totalAllRaw - layer1SumRaw, 0);
+    const remainingPercent = totalAllRaw > 0 ? Math.round((remainingRaw / totalAllRaw) * 100) : 0;
+    const finalPercents = [...percents];
 
     if (remainingWeighted > 0) {
         finalLabels.push('未完成任務');
@@ -250,6 +240,7 @@ function getLayeredChartData(dataObj, rawDataObj) {
         finalRawL1.push(remainingRaw);
         finalRawL2.push(0);
         finalRawL3.push(0);
+        finalPercents.push(remainingPercent);
     }
     if (finalL1.length === 0 || finalL1.every(v => v === 0)) {
         finalLabels.push('尚無資料');
@@ -260,6 +251,7 @@ function getLayeredChartData(dataObj, rawDataObj) {
         finalRawL1.push(0);
         finalRawL2.push(0);
         finalRawL3.push(0);
+        finalPercents.push(0);
     }
 
     return {
@@ -270,6 +262,9 @@ function getLayeredChartData(dataObj, rawDataObj) {
         layer3Values: finalL3,
         rawLayer1Values: finalRawL1,
         rawLayer2Values: finalRawL2,
-        rawLayer3Values: finalRawL3
+        rawLayer3Values: finalRawL3,
+        percents: finalPercents,
+        layer1Complete,
+        layer2Complete
     };
 }

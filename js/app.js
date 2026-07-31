@@ -172,6 +172,9 @@ function loadDataFromStorage() {
             saveDataToStorage(); // 全新使用者，第一次整包寫入是合理的
         }
         window.globalAppData = globalAppData;
+        if (typeof migrateOldTimelineSessionsFor4amReset === 'function') {
+            migrateOldTimelineSessionsFor4amReset();
+        }
         updateView();
 
         // 資料已經抓好了，這時候才把「查看年度年曆總覽」「每日時間線」按鈕打開，

@@ -13,6 +13,10 @@
 
 const timelineWeekdayNames = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"];
 
+// 一天從凌晨 4 點開始算起（配合全站凌晨 4 點重置的規則），時間線的小時分隔格線也是從這個時間點畫起，
+// 最後一格是凌晨 3 點～3:59（緊接著就是下一個有效日凌晨 4 點的開始）。
+const TIMELINE_DAY_START_MINUTES = 4 * 60;
+
 let timelineWeekStart = null;      // 目前顯示的那一週，週一當天 00:00 的 Date
 let timerTotalSeconds = 25 * 60;   // 這次計時總共設定幾秒
 let timerRemainingSeconds = 25 * 60; // 倒數剩餘秒數
@@ -42,6 +46,33 @@ function timelineAddDays(d, n) {
     const copy = new Date(d);
     copy.setDate(copy.getDate() + n);
     return copy;
+}
+
+// ================= 舊資料修正：凌晨 4 點重置規則上線之前的紀錄 =================
+// 這個規則上線之前，凌晨 0:00~3:59 記錄的時間線紀錄，日期是用「記錄當下的日曆日期」存的，
+// startMinutes 也是單純的 0~239（0:00~3:59），不是現在的「歸屬到前一天＋延伸分鐘數 1440~1679」規則。
+// 這裡統一修正一次：只要 startMinutes < 240（代表還是舊格式，新格式的紀錄不可能是這個範圍），
+// 就把日期往前推一天、startMinutes 加上 1440，改成跟新紀錄一致的規則。
+// 修正過的紀錄 startMinutes 一定會 >= 240，之後重複執行這個函式也不會再重複修正到，可以放心每次讀取資料都跑一次。
+function migrateOldTimelineSessionsFor4amReset() {
+    const sessions = (window.globalAppData && window.globalAppData.timelineSessions) || [];
+    let changed = false;
+
+    sessions.forEach(s => {
+        if (typeof s.startMinutes === 'number' && s.startMinutes < 4 * 60 && s.date) {
+            const d = new Date(s.date + 'T00:00:00');
+            if (!isNaN(d.getTime())) {
+                d.setDate(d.getDate() - 1);
+                s.date = timelineFormatDateStr(d);
+                s.startMinutes += 24 * 60;
+                changed = true;
+            }
+        }
+    });
+
+    if (changed && typeof saveTimelineSessions === 'function') {
+        saveTimelineSessions();
+    }
 }
 
 // ================= 項目選擇（大類別／分項下拉選單） =================
@@ -147,6 +178,7 @@ function startTimelineTimer() {
 
     timerRunning = true;
     timelineSyncTimerButtons();
+    updatePomodoroFabState();
 
     timerIntervalId = setInterval(() => {
         timerRemainingSeconds--;
@@ -162,6 +194,7 @@ function pauseTimelineTimer() {
     timerIntervalId = null;
     timerRunning = false;
     timelineSyncTimerButtons();
+    updatePomodoroFabState();
 }
 
 // 結束目前這段計時並記錄到時間線上（不論是倒數自然結束、還是使用者提早按「結束並記錄」）
@@ -181,6 +214,7 @@ function finishTimelineSession() {
     timerSessionStartedAt = null;
     timelineResetTimerToConfigured();
     timelineSyncTimerButtons();
+    updatePomodoroFabState();
 }
 
 // 把一段「開始時間～結束時間」記錄成一筆時間線紀錄，存進 globalAppData 並同步到 Firebase
@@ -399,8 +433,13 @@ function renderWeeklyTimeline() {
     }).join('');
 
     const allSessions = window.globalAppData.timelineSessions || [];
+    const toClock = (mins) => {
+        const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+        return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+    };
 
-    // 每天欄位：把當天的紀錄依開始時間排序，一張一張卡片往下疊，不畫小時格線、不用比例定位
+    // 每天欄位：24 個小時分隔，從凌晨 4 點開始算起、凌晨 3 點結束（配合全站凌晨 4 點重置的規則）。
+    // 那個小時有紀錄，就完整顯示卡片文字；沒有紀錄的小時縮小成一條細線，不佔太多版面。
     let daysHtml = '';
     weekDates.forEach(d => {
         const dStr = timelineFormatDateStr(d);
@@ -409,19 +448,22 @@ function renderWeeklyTimeline() {
             .filter(s => s.date === dStr)
             .sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
 
-        let blocksHtml = '';
-        if (daySessions.length === 0) {
-            blocksHtml = `<div class="timeline-empty-day-hint">尚無紀錄</div>`;
-        } else {
-            daySessions.forEach(s => {
+        let hoursHtml = '';
+        for (let slot = 0; slot < 24; slot++) {
+            const slotStartMinutes = TIMELINE_DAY_START_MINUTES + slot * 60;
+            const slotEndMinutes = slotStartMinutes + 60;
+            const slotSessions = daySessions.filter(s => {
+                const start = s.startMinutes || 0;
+                return start >= slotStartMinutes && start < slotEndMinutes;
+            });
+            const hasContent = slotSessions.length > 0;
+            const hourLabel = toClock(slotStartMinutes);
+
+            let contentHtml = '';
+            slotSessions.forEach(s => {
                 const startTotal = s.startMinutes || 0;
                 const endTotal = startTotal + (s.durationMinutes || 0);
-                const toClock = (mins) => {
-                    const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
-                    return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
-                };
-
-                blocksHtml += `
+                contentHtml += `
                     <div class="timeline-block" style="background-color:${s.color};" title="${s.name}（${s.durationMinutes} 分鐘）">
                         <div class="timeline-block-time">${toClock(startTotal)} - ${toClock(endTotal)}</div>
                         <div class="timeline-block-text">${s.name}</div>
@@ -429,11 +471,18 @@ function renderWeeklyTimeline() {
                     </div>
                 `;
             });
+
+            hoursHtml += `
+                <div class="timeline-hour-row ${hasContent ? 'has-content' : 'is-empty'}">
+                    <div class="timeline-hour-label">${hourLabel}</div>
+                    <div class="timeline-hour-content">${contentHtml}</div>
+                </div>
+            `;
         }
 
         daysHtml += `
             <div class="timeline-day-column ${isToday ? 'is-today' : ''}">
-                ${blocksHtml}
+                ${hoursHtml}
             </div>
         `;
     });
@@ -478,17 +527,7 @@ function formatTimelineMinutes(totalMinutes) {
 function initTimelinePage() {
     if (!timelineWeekStart) timelineWeekStart = timelineGetMonday(getEffectiveNow());
 
-    renderTimelineItemSelectors();
     renderWeeklyTimeline();
-
-    // 只有在目前「沒有進行中、也沒有暫停中」的計時時，才把倒數重置成輸入框設定的分鐘數；
-    // 如果計時正在跑、或是被暫停在中途，切換頁面離開再回來都不應該影響進度，直接顯示目前剩餘的時間就好。
-    if (!timerSessionStartedAt) {
-        timelineResetTimerToConfigured();
-    } else {
-        timelineUpdateTimerDisplay();
-    }
-    timelineSyncTimerButtons();
 
     // 手動記錄區塊：項目下拉選單、顏色盤每次進頁都重新整理一次（避免主頁那邊新增/刪除過分類後沒同步到）
     renderManualLogCategorySelector();
@@ -509,6 +548,21 @@ function initTimelinePage() {
 
     const todayBtn = document.getElementById('timeline-today-btn');
     if (todayBtn) todayBtn.onclick = goToTodayTimelineWeek;
+}
+
+// ================= 番茄鐘浮動按鈕與彈出面板（獨立於時間線頁，主頁右下角就能用） =================
+// 每次打開彈出面板都重新整理一次：項目下拉選單（避免主頁新增/刪除過分類後沒同步到）＋目前的計時狀態
+// （進行中或暫停中的計時，時間要正確保留，不能因為關掉再打開面板就被重置）。
+function initPomodoroWidget() {
+    renderTimelineItemSelectors();
+
+    if (!timerSessionStartedAt) {
+        timelineResetTimerToConfigured();
+    } else {
+        timelineUpdateTimerDisplay();
+    }
+    timelineSyncTimerButtons();
+    updatePomodoroFabState();
 
     const startBtn = document.getElementById('timeline-timer-start-btn');
     if (startBtn) startBtn.onclick = startTimelineTimer;
@@ -534,3 +588,40 @@ function initTimelinePage() {
         };
     }
 }
+
+// 圓形按鈕上做個簡單的狀態提示：計時中會有脈動效果，暫停中則是靜態的提醒色
+function updatePomodoroFabState() {
+    const fabBtn = document.getElementById('pomodoro-fab-btn');
+    if (!fabBtn) return;
+    fabBtn.classList.toggle('is-running', timerRunning);
+    fabBtn.classList.toggle('is-paused', !timerRunning && !!timerSessionStartedAt);
+}
+
+function openPomodoroPopup() {
+    const popup = document.getElementById('pomodoro-popup');
+    if (!popup) return;
+    initPomodoroWidget();
+    popup.classList.remove('hidden');
+}
+
+function closePomodoroPopup() {
+    const popup = document.getElementById('pomodoro-popup');
+    if (popup) popup.classList.add('hidden');
+}
+
+function togglePomodoroPopup() {
+    const popup = document.getElementById('pomodoro-popup');
+    if (!popup) return;
+    if (popup.classList.contains('hidden')) {
+        openPomodoroPopup();
+    } else {
+        closePomodoroPopup();
+    }
+}
+
+// 圓形按鈕跟關閉鈕的事件綁定只需要做一次（不像分頁切換那樣會重複呼叫），直接在腳本載入時綁定
+const pomodoroFabBtn = document.getElementById('pomodoro-fab-btn');
+if (pomodoroFabBtn) pomodoroFabBtn.addEventListener('click', togglePomodoroPopup);
+
+const closePomodoroPopupBtn = document.getElementById('close-pomodoro-popup-btn');
+if (closePomodoroPopupBtn) closePomodoroPopupBtn.addEventListener('click', closePomodoroPopup);

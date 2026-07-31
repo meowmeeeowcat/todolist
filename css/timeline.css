@@ -204,14 +204,12 @@
     align-items: start;
 }
 
-/* 每天一欄，裡面的紀錄卡片依開始時間先後由上往下堆疊，沒有小時格線、也不是照時長比例畫的 */
+/* 每天一欄，裡面依 24 個小時分隔（凌晨4點開始、凌晨3點結束）：
+   有紀錄的小時完整顯示卡片內容，沒有紀錄的小時縮成一條細線，不佔太多版面。 */
 .timeline-day-column {
     border-left: 1px solid #f1f5f9;
-    padding: 8px 6px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    min-height: 90px;
 }
 .timeline-day-column:first-child {
     border-left: none;
@@ -221,12 +219,45 @@
     background-color: #f0fbfd;
 }
 
-.timeline-empty-day-hint {
+.timeline-hour-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 2px 6px;
+    border-bottom: 1px dashed #f4f6f8;
+    box-sizing: border-box;
+}
+
+.timeline-hour-row.is-empty {
+    min-height: 9px;
+    opacity: 0.55;
+}
+.timeline-hour-row.is-empty .timeline-hour-label {
+    font-size: 8px;
     color: #cbd5e1;
-    font-size: 12px;
-    text-align: center;
-    padding-top: 24px;
-    font-style: italic;
+    padding-top: 0;
+}
+
+.timeline-hour-row.has-content {
+    min-height: 40px;
+    padding: 5px 6px;
+}
+
+.timeline-hour-label {
+    flex-shrink: 0;
+    width: 30px;
+    font-size: 10px;
+    color: #94a3b8;
+    padding-top: 2px;
+    box-sizing: border-box;
+}
+
+.timeline-hour-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .timeline-block {
@@ -247,7 +278,7 @@
 .timeline-block-text {
     font-weight: bold;
     margin-top: 2px;
-    overflow-wrap: break-word;
+    overflow-wrap: break-word; /* 允許換行，確保文字完整顯示不被裁切 */
     padding-right: 16px; /* 留空間給右上角的刪除鈕，避免文字太長時被蓋住 */
 }
 

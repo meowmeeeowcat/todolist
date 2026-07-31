@@ -104,6 +104,31 @@
                 <ul id="temp-task-list"></ul>
             </div>
         </div>
+
+        <!-- ================= 番茄鐘：圓形浮動按鈕＋彈出面板，點按鈕才會展開 ================= -->
+        <button id="pomodoro-fab-btn" class="pomodoro-fab-btn" title="番茄鐘計時器">🍅</button>
+        <div id="pomodoro-popup" class="pomodoro-popup hidden">
+            <div class="pomodoro-popup-header">
+                <h4>番茄鐘計時器</h4>
+                <button class="close-modal-btn" id="close-pomodoro-popup-btn">&times;</button>
+            </div>
+            <div id="timeline-timer-display" class="timeline-timer-display">25:00</div>
+            <div class="timeline-timer-controls">
+                <input type="number" id="timeline-timer-minutes" min="1" max="180" value="25" title="設定分鐘數">
+                <button id="timeline-timer-start-btn">開始</button>
+                <button id="timeline-timer-pause-btn" class="hidden" style="background-color:#94a3b8;">暫停</button>
+                <button id="timeline-timer-stop-btn" class="hidden" style="background-color:#ee5253;">結束並記錄</button>
+            </div>
+            <h4 class="timeline-subheading">選擇要計時的項目</h4>
+            <div id="timeline-session-hint" class="no-data-hint"></div>
+            <div class="form-row">
+                <select id="timeline-category-select"></select>
+            </div>
+            <div class="form-row">
+                <select id="timeline-subitem-select"></select>
+            </div>
+            <p class="timeline-left-hint">計時開始後會記錄「開始～結束」的時間區段，並顯示在每日時間線上；提早按「結束並記錄」也會照實際經過的時間記錄一筆。</p>
+        </div>
     </div>
 
     <!-- ================= 年度總覽頁（預設隱藏，切換時才顯示） ================= -->
@@ -152,29 +177,8 @@
 
         <div class="timeline-dashboard">
             <div class="timeline-left">
-                <h3>番茄鐘計時器</h3>
-                <div id="timeline-timer-display" class="timeline-timer-display">25:00</div>
-                <div class="timeline-timer-controls">
-                    <input type="number" id="timeline-timer-minutes" min="1" max="180" value="25" title="設定分鐘數">
-                    <button id="timeline-timer-start-btn">開始</button>
-                    <button id="timeline-timer-pause-btn" class="hidden" style="background-color:#94a3b8;">暫停</button>
-                    <button id="timeline-timer-stop-btn" class="hidden" style="background-color:#ee5253;">結束並記錄</button>
-                </div>
-
-                <h4 class="timeline-subheading">選擇要計時的項目</h4>
-                <div id="timeline-session-hint" class="no-data-hint"></div>
-                <div class="form-row">
-                    <select id="timeline-category-select"></select>
-                </div>
-                <div class="form-row">
-                    <select id="timeline-subitem-select"></select>
-                </div>
-                <p class="timeline-left-hint">計時開始後會記錄「開始～結束」的時間區段，並顯示在右邊當週的時間線上；提早按「結束並記錄」也會照實際經過的時間記錄一筆。</p>
-
-                <hr class="timeline-divider">
-
                 <h3>手動記錄時間</h3>
-                <p class="timeline-left-hint">不用開計時器，直接選項目（或自訂一個項目清單裡沒有的名稱）＋填起訖時間，就能補記一筆時間紀錄。</p>
+                <p class="timeline-left-hint">不用開計時器，直接選項目（或自訂一個項目清單裡沒有的名稱）＋填起訖時間，就能補記一筆時間紀錄。想邊做邊計時的話，改用主頁右下角的番茄鐘圓形按鈕。</p>
                 <div class="form-row">
                     <select id="manual-log-category-select"></select>
                 </div>
