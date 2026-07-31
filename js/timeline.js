@@ -261,6 +261,9 @@ function deleteTimelineSession(id) {
 // 加上起訖時間就能補記一筆。顏色預設跟著選到的大類別走，但使用者可以自己從馬卡龍色盤挑別的顏色。
 let manualLogSelectedColor = (window.fixedPalette && window.fixedPalette[0] && window.fixedPalette[0].color) || '#bae1ff';
 
+let manualLogColorLocked = false;   // 選了現有大類別時，顏色要鎖定跟著該類別走，不開放使用者自己改
+let editingTimelineSessionId = null; // 目前是不是正在編輯某一筆既有的時間線紀錄（null＝新增模式）
+
 function renderManualLogCategorySelector() {
     const catSel = document.getElementById('manual-log-category-select');
     const subSel = document.getElementById('manual-log-subitem-select');
@@ -269,40 +272,57 @@ function renderManualLogCategorySelector() {
     const template = (window.globalAppData && window.globalAppData.template) || {};
     const catKeys = Object.keys(template).filter(k => !template[k].archived);
 
+    const prevValue = catSel.value;
     catSel.innerHTML = `<option value="">— 不選分類，自訂項目 —</option>` + catKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+    if (catKeys.includes(prevValue)) catSel.value = prevValue;
 
-    function fillManualSubSelect() {
-        const catKey = catSel.value;
-        if (!catKey) {
-            subSel.innerHTML = `<option value="">（無）</option>`;
-            subSel.disabled = true;
-            return;
-        }
-        subSel.disabled = false;
-        const cat = template[catKey];
-        const subItems = (cat && cat.subItems) || {};
-        const subKeys = Object.keys(subItems).filter(k => !subItems[k].archived);
-        subSel.innerHTML = `<option value="">— 選擇分項 —</option>` + subKeys.map(k => `<option value="${k}">${k}</option>`).join('');
-    }
-
-    // 選了大類別／分項時，自動幫忙帶入顯示名稱跟顏色（使用者之後還是可以自己改）
-    function autoFillFromSelection() {
-        const catKey = catSel.value;
-        const subKey = subSel.value;
-        const nameInput = document.getElementById('manual-log-name');
-        if (catKey && subKey && nameInput) {
-            nameInput.value = subKey;
-            manualLogSelectedColor = getSafeMacaronColor(catKey, '#bae1ff');
-            renderManualLogColorPalette();
-        }
-    }
-
-    fillManualSubSelect();
-    catSel.onchange = () => { fillManualSubSelect(); autoFillFromSelection(); };
-    subSel.onchange = autoFillFromSelection;
+    manualLogFillSubSelect();
+    catSel.onchange = manualLogSyncFromCategory;
+    subSel.onchange = manualLogSyncFromCategory;
 }
 
-// 顏色選擇盤：跟主頁「新增全新類別」用的是同一套馬卡龍色盤（window.fixedPalette），畫法也比照那邊
+function manualLogFillSubSelect() {
+    const catSel = document.getElementById('manual-log-category-select');
+    const subSel = document.getElementById('manual-log-subitem-select');
+    if (!catSel || !subSel) return;
+
+    const catKey = catSel.value;
+    if (!catKey) {
+        subSel.innerHTML = `<option value="">（無）</option>`;
+        subSel.disabled = true;
+        return;
+    }
+    subSel.disabled = false;
+    const template = (window.globalAppData && window.globalAppData.template) || {};
+    const cat = template[catKey];
+    const subItems = (cat && cat.subItems) || {};
+    const subKeys = Object.keys(subItems).filter(k => !subItems[k].archived);
+    subSel.innerHTML = `<option value="">— 選擇分項 —</option>` + subKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+}
+
+// 選了大類別／分項時：分項選單跟著更新，並且只要選了「現有大類別」，顏色就鎖定跟著該類別走（不開放自己改）；
+// 沒選大類別（自訂項目）的話，顏色恢復成可以自由挑選。分項名稱有選到的話，也會自動幫忙帶入顯示名稱。
+function manualLogSyncFromCategory() {
+    manualLogFillSubSelect();
+
+    const catSel = document.getElementById('manual-log-category-select');
+    const subSel = document.getElementById('manual-log-subitem-select');
+    const nameInput = document.getElementById('manual-log-name');
+    const catKey = catSel ? catSel.value : '';
+    const subKey = subSel ? subSel.value : '';
+
+    if (catKey) {
+        manualLogColorLocked = true;
+        manualLogSelectedColor = getSafeMacaronColor(catKey, '#bae1ff');
+        if (subKey && nameInput) nameInput.value = subKey;
+    } else {
+        manualLogColorLocked = false;
+    }
+    renderManualLogColorPalette();
+}
+
+// 顏色選擇盤：跟主頁「新增全新類別」用的是同一套馬卡龍色盤（window.fixedPalette），畫法也比照那邊。
+// manualLogColorLocked 為 true 時（選了現有大類別），色盤只顯示目前顏色，不能點選其他顏色。
 function renderManualLogColorPalette() {
     const container = document.getElementById('manual-log-color-palette');
     if (!container) return;
@@ -310,18 +330,20 @@ function renderManualLogColorPalette() {
 
     (window.fixedPalette || []).forEach(item => {
         const swatch = document.createElement('div');
-        swatch.className = 'timeline-color-swatch';
+        swatch.className = 'timeline-color-swatch' + (manualLogColorLocked ? ' is-locked' : '');
         swatch.style.backgroundColor = item.color;
-        swatch.title = item.name;
+        swatch.title = manualLogColorLocked ? '已選擇大類別，顏色固定跟著該類別' : item.name;
 
         if (item.color === manualLogSelectedColor) {
             swatch.classList.add('is-selected');
         }
 
-        swatch.addEventListener('click', () => {
-            manualLogSelectedColor = item.color;
-            renderManualLogColorPalette();
-        });
+        if (!manualLogColorLocked) {
+            swatch.addEventListener('click', () => {
+                manualLogSelectedColor = item.color;
+                renderManualLogColorPalette();
+            });
+        }
 
         container.appendChild(swatch);
     });
@@ -332,6 +354,65 @@ function timelineTimeStrToMinutes(hhmm) {
     const h = parseInt(parts[0], 10) || 0;
     const m = parseInt(parts[1], 10) || 0;
     return h * 60 + m;
+}
+
+// 把延伸分鐘數（可能是 0~1679，包含凌晨 0~3 點的 24:00~27:59 延伸時段）轉成 <input type="time"> 看得懂的正常時間字串
+function timelineMinutesToTimeInputValue(mins) {
+    const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+    return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+}
+
+// 點擊時間線上的某一筆紀錄時呼叫：把手動記錄表單填成那一筆紀錄的內容，切換成「編輯模式」
+function openManualLogEditor(sessionId) {
+    const session = (window.globalAppData.timelineSessions || []).find(s => s.id === sessionId);
+    if (!session) return;
+
+    editingTimelineSessionId = sessionId;
+
+    const catSel = document.getElementById('manual-log-category-select');
+    const subSel = document.getElementById('manual-log-subitem-select');
+    const nameInput = document.getElementById('manual-log-name');
+    const dateInput = document.getElementById('manual-log-date');
+    const startInput = document.getElementById('manual-log-start-time');
+    const endInput = document.getElementById('manual-log-end-time');
+    const submitBtn = document.getElementById('manual-log-submit-btn');
+    const cancelBtn = document.getElementById('manual-log-cancel-btn');
+
+    if (catSel) catSel.value = session.categoryKey || '';
+    manualLogSyncFromCategory(); // 連動更新分項選單、顏色鎖定狀態
+    if (subSel) subSel.value = session.subKey || '';
+    if (nameInput) nameInput.value = session.name || '';
+    if (dateInput) dateInput.value = session.date || '';
+    if (startInput) startInput.value = timelineMinutesToTimeInputValue(session.startMinutes || 0);
+    if (endInput) endInput.value = timelineMinutesToTimeInputValue((session.startMinutes || 0) + (session.durationMinutes || 0));
+
+    // 沒有選大類別（自訂項目）時，顏色照原本存的紀錄還原；有大類別的話，顏色本來就會鎖定跟著類別走
+    if (!session.categoryKey) {
+        manualLogSelectedColor = session.color || manualLogSelectedColor;
+        manualLogColorLocked = false;
+    }
+    renderManualLogColorPalette();
+
+    if (submitBtn) submitBtn.innerText = '更新紀錄';
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+    const formSection = document.querySelector('.timeline-left');
+    if (formSection && formSection.scrollIntoView) formSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 取消編輯：清空編輯狀態，表單的名稱跟時間欄位一併清掉（日期/分類保留，方便繼續輸入下一筆）
+function cancelManualLogEdit() {
+    editingTimelineSessionId = null;
+    const submitBtn = document.getElementById('manual-log-submit-btn');
+    const cancelBtn = document.getElementById('manual-log-cancel-btn');
+    const nameInput = document.getElementById('manual-log-name');
+    const startInput = document.getElementById('manual-log-start-time');
+    const endInput = document.getElementById('manual-log-end-time');
+    if (submitBtn) submitBtn.innerText = '新增紀錄';
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (nameInput) nameInput.value = '';
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
 }
 
 function submitManualLogEntry() {
@@ -367,25 +448,43 @@ function submitManualLogEntry() {
         return;
     }
 
-    const session = {
-        id: 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        date: dateStr,
-        startMinutes: startMinutes,
-        durationMinutes: endMinutes - startMinutes,
-        categoryKey: (catSel && catSel.value) || '',
-        subKey: (subSel && subSel.value) || '',
-        name: name,
-        color: manualLogSelectedColor
-    };
-
     if (!window.globalAppData.timelineSessions) window.globalAppData.timelineSessions = [];
-    window.globalAppData.timelineSessions.push(session);
+
+    if (editingTimelineSessionId) {
+        // 編輯模式：更新既有那一筆，不新增
+        const idx = window.globalAppData.timelineSessions.findIndex(s => s.id === editingTimelineSessionId);
+        if (idx !== -1) {
+            window.globalAppData.timelineSessions[idx] = {
+                ...window.globalAppData.timelineSessions[idx],
+                date: dateStr,
+                startMinutes: startMinutes,
+                durationMinutes: endMinutes - startMinutes,
+                categoryKey: (catSel && catSel.value) || '',
+                subKey: (subSel && subSel.value) || '',
+                name: name,
+                color: manualLogSelectedColor
+            };
+        }
+        cancelManualLogEdit(); // 更新完自動退出編輯模式，按鈕文字改回「新增紀錄」
+    } else {
+        const session = {
+            id: 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+            date: dateStr,
+            startMinutes: startMinutes,
+            durationMinutes: endMinutes - startMinutes,
+            categoryKey: (catSel && catSel.value) || '',
+            subKey: (subSel && subSel.value) || '',
+            name: name,
+            color: manualLogSelectedColor
+        };
+        window.globalAppData.timelineSessions.push(session);
+        // 保留日期跟項目選擇，方便使用者連續補記好幾筆同一天的紀錄，只清空時間欄位
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
+    }
+
     saveTimelineSessions();
     renderWeeklyTimeline();
-
-    // 保留日期跟項目選擇，方便使用者連續補記好幾筆同一天的紀錄，只清空時間欄位
-    if (startInput) startInput.value = '';
-    if (endInput) endInput.value = '';
 }
 
 // ================= 每週時間線格線渲染 =================
@@ -452,24 +551,36 @@ function renderWeeklyTimeline() {
         for (let slot = 0; slot < 24; slot++) {
             const slotStartMinutes = TIMELINE_DAY_START_MINUTES + slot * 60;
             const slotEndMinutes = slotStartMinutes + 60;
-            const slotSessions = daySessions.filter(s => {
+            // 只要紀錄的時間區段跟這個小時有重疊，這個小時就算被這筆紀錄佔用（不是只看開始時間落在哪一格）
+            const overlappingSessions = daySessions.filter(s => {
                 const start = s.startMinutes || 0;
-                return start >= slotStartMinutes && start < slotEndMinutes;
+                const end = start + (s.durationMinutes || 0);
+                return start < slotEndMinutes && end > slotStartMinutes;
             });
-            const hasContent = slotSessions.length > 0;
+            const hasContent = overlappingSessions.length > 0;
             const hourLabel = toClock(slotStartMinutes);
 
             let contentHtml = '';
-            slotSessions.forEach(s => {
+            overlappingSessions.forEach(s => {
                 const startTotal = s.startMinutes || 0;
                 const endTotal = startTotal + (s.durationMinutes || 0);
-                contentHtml += `
-                    <div class="timeline-block" style="background-color:${s.color};" title="${s.name}（${s.durationMinutes} 分鐘）">
-                        <div class="timeline-block-time">${toClock(startTotal)} - ${toClock(endTotal)}</div>
-                        <div class="timeline-block-text">${s.name}</div>
-                        <button class="timeline-block-delete" data-id="${s.id}" title="刪除這筆紀錄">&times;</button>
-                    </div>
-                `;
+                const isStartSlot = startTotal >= slotStartMinutes && startTotal < slotEndMinutes;
+
+                if (isStartSlot) {
+                    // 紀錄從這一格開始：完整顯示卡片內容（時間範圍＋名稱＋刪除鈕）
+                    contentHtml += `
+                        <div class="timeline-block" data-id="${s.id}" style="background-color:${s.color};" title="${s.name}（${s.durationMinutes} 分鐘，點擊可在左側編輯）">
+                            <div class="timeline-block-time">${toClock(startTotal)} - ${toClock(endTotal)}</div>
+                            <div class="timeline-block-text">${s.name}</div>
+                            <button class="timeline-block-delete" data-id="${s.id}" title="刪除這筆紀錄">&times;</button>
+                        </div>
+                    `;
+                } else {
+                    // 紀錄從更早的小時就開始了，這一格只是延續，用同色的延續色條把整格填滿，不重複顯示文字
+                    contentHtml += `
+                        <div class="timeline-block timeline-block-continued" data-id="${s.id}" style="background-color:${s.color};" title="${s.name}（${toClock(startTotal)} - ${toClock(endTotal)}，點擊可在左側編輯）"></div>
+                    `;
+                }
             });
 
             hoursHtml += `
@@ -495,6 +606,13 @@ function renderWeeklyTimeline() {
             if (confirm('確定要刪除這筆時間紀錄嗎？')) {
                 deleteTimelineSession(btn.getAttribute('data-id'));
             }
+        });
+    });
+
+    bodyEl.querySelectorAll('.timeline-block').forEach(block => {
+        block.addEventListener('click', () => {
+            const id = block.getAttribute('data-id');
+            if (id) openManualLogEditor(id);
         });
     });
 }
@@ -538,6 +656,9 @@ function initTimelinePage() {
     }
     const manualSubmitBtn = document.getElementById('manual-log-submit-btn');
     if (manualSubmitBtn) manualSubmitBtn.onclick = submitManualLogEntry;
+
+    const manualCancelBtn = document.getElementById('manual-log-cancel-btn');
+    if (manualCancelBtn) manualCancelBtn.onclick = cancelManualLogEdit;
 
     // 用 onclick 覆蓋而不是 addEventListener 疊加，避免每次切回這一頁都重複綁定
     const prevBtn = document.getElementById('timeline-prev-week-btn');
