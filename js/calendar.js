@@ -21,6 +21,19 @@ function getSafeMacaronColor(groupName, fallbackColor) {
     return fallbackColor || '#bae1ff';
 }
 
+// 取得某個大類別在馬卡龍色盤（window.fixedPalette，跟主頁新增類別可選的顏色是同一套）裡排第幾個，
+// 用來讓年曆頁的統計卡片依照色盤順序排列，而不是隨機的物件迭代順序。找不到的排到最後面。
+function getCategoryPaletteOrder(groupName) {
+    if (globalAppData && globalAppData.template && globalAppData.template[groupName] && window.fixedPalette) {
+        const hue = globalAppData.template[groupName].customHue;
+        if (hue !== undefined) {
+            const idx = window.fixedPalette.findIndex(p => p.hue === hue);
+            if (idx !== -1) return idx;
+        }
+    }
+    return 999;
+}
+
 // 計算「2026-01-01」到某個月份第 1 天之間，累積了幾天，藉此推算出該月 1 號是星期幾
 // （週一為索引 0 ...週日為索引 6；2026-01-01 是週四，索引為 3）
 function getMonthStartWeekdayIndex(monthIndex) {
@@ -193,7 +206,7 @@ function showDateDetails(dateStr, weekKey) {
             };
 
             html += `
-                <div class="detail-item detail-item-box" style="border-left:3px solid ${s.color || '#64748b'}">
+                <div class="detail-item detail-item-box" style="border-left:3px solid ${(typeof getTimelineSessionColor === 'function' ? getTimelineSessionColor(s) : s.color) || '#64748b'}">
                     <b>${s.name}</b> <br>
                     ${toClock(startTotal)} - ${toClock(endTotal)}（${s.durationMinutes} 分鐘）
                 </div>
@@ -246,7 +259,10 @@ function calculateAnnualSummaryStats() {
     }
 
     let hasAnyData = false;
-    for (let groupName in classifiedCounters) {
+    // 卡片依照馬卡龍色盤的順序排（跟主頁新增類別時可選的顏色順序一致），不是隨便照物件的迭代順序
+    const sortedGroupNames = Object.keys(classifiedCounters).sort((a, b) => getCategoryPaletteOrder(a) - getCategoryPaletteOrder(b));
+
+    sortedGroupNames.forEach(groupName => {
         const items = classifiedCounters[groupName];
         const itemKeys = Object.keys(items);
         if (itemKeys.length > 0) {
@@ -262,7 +278,7 @@ function calculateAnnualSummaryStats() {
             groupCard.innerHTML = html;
             container.appendChild(groupCard);
         }
-    }
+    });
     if (!hasAnyData) container.innerHTML = `<div class="no-data-hint">目前全年度尚無任何打卡執行紀錄。</div>`;
 }
 

@@ -662,6 +662,20 @@ button:hover {
     background-color: #475569;
 }
 
+/* ================= 年曆頁／時間線頁的「返回主頁」按鈕 ================= */
+.page-back-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    background: #64748b;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+.page-back-btn:hover {
+    background: #475569;
+}
+
 /* ================= 番茄鐘：右下角圓形浮動按鈕與彈出面板 ================= */
 .pomodoro-fab-btn {
     position: fixed;
@@ -896,6 +910,35 @@ button:hover {
     .todo-list-wrapper,
     .temp-task-list-wrapper {
         order: 3;
+    }
+
+    /* 清單改成跟著整個頁面一起捲動，不要有自己獨立的內部捲軸，
+       避免使用者要先滑頁面、清單露出來後又要另外滑一次清單內部這種「分兩段」的怪異體驗。 */
+    #todo-list, #temp-task-list {
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    /* 年曆頁／時間線頁的「返回主頁」按鈕縮成右上角的圓形圖示鍵，只留箭頭、不顯示文字，
+       用 #nav-back-btn.page-back-btn 這種 id+class 組合選擇器，確保能蓋過 calendar.css 裡單純用 id 設定的樣式。 */
+    .page-back-btn,
+    #nav-back-btn.page-back-btn {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1500;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .page-back-btn-text {
+        display: none;
     }
 
     .chart-wrapper {

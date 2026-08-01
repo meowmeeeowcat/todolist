@@ -256,6 +256,13 @@ function deleteTimelineSession(id) {
     renderWeeklyTimeline();
 }
 
+// 取得一筆時間線紀錄「現在」該顯示的顏色：有連結到大類別的話，一律用該大類別目前的顏色（就算後來改過顏色，
+// 舊紀錄也會自動校正過來，不會停留在記錄當下的舊顏色）；沒有連結大類別（自訂項目）的話，才使用紀錄自己存的顏色。
+function getTimelineSessionColor(s) {
+    if (s.categoryKey) return getSafeMacaronColor(s.categoryKey, s.color || '#bae1ff');
+    return s.color || '#bae1ff';
+}
+
 // ================= 手動記錄時間 =================
 // 跟番茄鐘計時器分開的另一種記錄方式：不用真的跑計時，直接選項目（或自訂一個項目清單裡沒有的名稱）
 // 加上起訖時間就能補記一筆。顏色預設跟著選到的大類別走，但使用者可以自己從馬卡龍色盤挑別的顏色。
@@ -519,8 +526,8 @@ function renderWeeklyTimeline() {
         labelEl.innerText = `${fmt(first)} - ${fmt(last)}`;
     }
 
-    // 表頭：週一～週日的日期（沒有時間刻度欄，7 天平分寬度）
-    headerEl.innerHTML = weekDates.map(d => {
+    // 表頭：左側先留一格對齊小時標籤欄，接著是週一～週日的日期
+    headerEl.innerHTML = `<div class="timeline-gutter-spacer"></div>` + weekDates.map(d => {
         const dStr = timelineFormatDateStr(d);
         const isToday = dStr === todayStr;
         return `
@@ -537,68 +544,92 @@ function renderWeeklyTimeline() {
         return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
     };
 
-    // 每天欄位：24 個小時分隔，從凌晨 4 點開始算起、凌晨 3 點結束（配合全站凌晨 4 點重置的規則）。
-    // 那個小時有紀錄，就完整顯示卡片文字；沒有紀錄的小時縮小成一條細線，不佔太多版面。
-    let daysHtml = '';
+    const sessionsByDate = {};
     weekDates.forEach(d => {
         const dStr = timelineFormatDateStr(d);
-        const isToday = dStr === todayStr;
-        const daySessions = allSessions
+        sessionsByDate[dStr] = allSessions
             .filter(s => s.date === dStr)
             .sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
+    });
 
-        let hoursHtml = '';
-        for (let slot = 0; slot < 24; slot++) {
-            const slotStartMinutes = TIMELINE_DAY_START_MINUTES + slot * 60;
-            const slotEndMinutes = slotStartMinutes + 60;
-            // 只要紀錄的時間區段跟這個小時有重疊，這個小時就算被這筆紀錄佔用（不是只看開始時間落在哪一格）
-            const overlappingSessions = daySessions.filter(s => {
+    // 整份表格用同一套 24 個小時分隔（凌晨 4 點開始、凌晨 3 點結束），小時標籤只在最左邊寫一次，
+    // 一整排（跨 7 天）用 CSS Grid 排版，只要這一排裡「任何一天」有紀錄，整排（包含其他沒紀錄的天）
+    // 就會自動一起被撐高，不需要另外寫程式去算高度，是 CSS Grid 同一列高度自動一致的特性。
+    let bodyHtml = '';
+    for (let slot = 0; slot < 24; slot++) {
+        const slotStartMinutes = TIMELINE_DAY_START_MINUTES + slot * 60;
+        const slotEndMinutes = slotStartMinutes + 60;
+        const hourLabel = toClock(slotStartMinutes);
+        let hasAnyContentThisHour = false;
+
+        let rowCellsHtml = '';
+        weekDates.forEach(d => {
+            const dStr = timelineFormatDateStr(d);
+            const isToday = dStr === todayStr;
+            const daySessions = sessionsByDate[dStr] || [];
+            // 只要紀錄的時間區段跟這個小時有重疊，這個小時就算被這筆紀錄佔用（不是只看開始時間落在哪一格），
+            // 這樣「4點做到6點」才會讓4點、5點兩格都顯示這件事，把中間經過的每個小時都填滿。
+            const overlapping = daySessions.filter(s => {
                 const start = s.startMinutes || 0;
                 const end = start + (s.durationMinutes || 0);
                 return start < slotEndMinutes && end > slotStartMinutes;
             });
-            const hasContent = overlappingSessions.length > 0;
-            const hourLabel = toClock(slotStartMinutes);
 
-            let contentHtml = '';
-            overlappingSessions.forEach(s => {
+            let cellContent = '';
+            let continuesBelow = false;
+            let continuedFromAbove = false;
+
+            overlapping.forEach(s => {
+                hasAnyContentThisHour = true;
                 const startTotal = s.startMinutes || 0;
                 const endTotal = startTotal + (s.durationMinutes || 0);
                 const isStartSlot = startTotal >= slotStartMinutes && startTotal < slotEndMinutes;
+                const isEndSlot = endTotal > slotStartMinutes && endTotal <= slotEndMinutes;
+                if (!isStartSlot) continuedFromAbove = true;
+                if (!isEndSlot) continuesBelow = true;
+                // 顏色一律用「這個項目目前」的大類別顏色即時計算，不是用紀錄當初存的舊顏色，
+                // 這樣就算之後改了大類別的顏色，之前記錄的時間線也會自動跟著校正，不會顯示過時的顏色。
+                const displayColor = getTimelineSessionColor(s);
 
                 if (isStartSlot) {
-                    // 紀錄從這一格開始：完整顯示卡片內容（時間範圍＋名稱＋刪除鈕）
-                    contentHtml += `
-                        <div class="timeline-block" data-id="${s.id}" style="background-color:${s.color};" title="${s.name}（${s.durationMinutes} 分鐘，點擊可在左側編輯）">
+                    // 紀錄從這一格開始：完整顯示卡片內容（時間範圍＋名稱＋刪除鈕）；
+                    // 如果還會延續到下一小時，底部先不畫圓角，讓下面的延續色條可以無縫接上去。
+                    const extraClass = isEndSlot ? '' : ' segment-start-continues';
+                    cellContent += `
+                        <div class="timeline-block${extraClass}" data-id="${s.id}" style="background-color:${displayColor};" title="${s.name}（${s.durationMinutes} 分鐘，點擊可在左側編輯）">
                             <div class="timeline-block-time">${toClock(startTotal)} - ${toClock(endTotal)}</div>
                             <div class="timeline-block-text">${s.name}</div>
                             <button class="timeline-block-delete" data-id="${s.id}" title="刪除這筆紀錄">&times;</button>
                         </div>
                     `;
                 } else {
-                    // 紀錄從更早的小時就開始了，這一格只是延續，用同色的延續色條把整格填滿，不重複顯示文字
-                    contentHtml += `
-                        <div class="timeline-block timeline-block-continued" data-id="${s.id}" style="background-color:${s.color};" title="${s.name}（${toClock(startTotal)} - ${toClock(endTotal)}，點擊可在左側編輯）"></div>
+                    // 紀錄從更早的小時就開始了，這一格只是延續，用同色的延續色條把整格填滿，不重複顯示文字；
+                    // 如果這一格剛好是這筆紀錄的最後一段，底部畫圓角收尾，其餘中間段落維持方形無縫銜接。
+                    const extraClass = isEndSlot ? ' segment-end' : '';
+                    cellContent += `
+                        <div class="timeline-block timeline-block-continued${extraClass}" data-id="${s.id}" style="background-color:${displayColor};" title="${s.name}（${toClock(startTotal)} - ${toClock(endTotal)}，點擊可在左側編輯）"></div>
                     `;
                 }
             });
 
-            hoursHtml += `
-                <div class="timeline-hour-row ${hasContent ? 'has-content' : 'is-empty'}">
-                    <div class="timeline-hour-label">${hourLabel}</div>
-                    <div class="timeline-hour-content">${contentHtml}</div>
-                </div>
-            `;
-        }
+            const cellClasses = [
+                'timeline-day-cell',
+                isToday ? 'is-today' : '',
+                overlapping.length > 0 ? 'has-content' : 'is-empty',
+                continuesBelow ? 'continues-below' : '',
+                continuedFromAbove ? 'continued-from-above' : ''
+            ].filter(Boolean).join(' ');
 
-        daysHtml += `
-            <div class="timeline-day-column ${isToday ? 'is-today' : ''}">
-                ${hoursHtml}
-            </div>
+            rowCellsHtml += `<div class="${cellClasses}">${cellContent}</div>`;
+        });
+
+        bodyHtml += `
+            <div class="timeline-hour-label-cell ${hasAnyContentThisHour ? 'has-content' : 'is-empty'}">${hourLabel}</div>
+            ${rowCellsHtml}
         `;
-    });
+    }
 
-    bodyEl.innerHTML = daysHtml;
+    bodyEl.innerHTML = bodyHtml;
 
     bodyEl.querySelectorAll('.timeline-block-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -610,7 +641,8 @@ function renderWeeklyTimeline() {
     });
 
     bodyEl.querySelectorAll('.timeline-block').forEach(block => {
-        block.addEventListener('click', () => {
+        block.addEventListener('click', (e) => {
+            if (e.target.closest('.timeline-block-delete')) return;
             const id = block.getAttribute('data-id');
             if (id) openManualLogEditor(id);
         });

@@ -161,8 +161,12 @@
 
 .timeline-grid-header {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: 40px repeat(7, 1fr);
     border-bottom: 2px solid #e2e8f0;
+}
+
+.timeline-gutter-spacer {
+    /* 對齊左側小時標籤欄的空白格 */
 }
 
 .timeline-day-header {
@@ -170,9 +174,6 @@
     padding: 6px 0 10px 0;
     color: #64748b;
     border-left: 1px solid #f1f5f9;
-}
-.timeline-day-header:first-child {
-    border-left: none;
 }
 
 .timeline-day-name {
@@ -204,66 +205,53 @@
     border-top: none;
 }
 
+/* 整份時間線用同一張 CSS Grid：40px 的小時標籤欄 + 7 天平分寬度。
+   小時標籤只在最左邊寫一次（不像以前每天各自重複一份），每一列代表一個小時，橫跨全部 7 天；
+   只要這一列裡任何一天有紀錄，CSS Grid 就會自動把整列（含其他沒紀錄的天）撐到同樣的高度，
+   不需要額外寫程式計算，這是 grid 同一列格子高度自動一致的特性。 */
 .timeline-grid-body {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    align-items: start;
+    grid-template-columns: 40px repeat(7, 1fr);
 }
 
-/* 每天一欄，裡面依 24 個小時分隔（凌晨4點開始、凌晨3點結束）：
-   有紀錄的小時完整顯示卡片內容，沒有紀錄的小時縮成一條細線，不佔太多版面。 */
-.timeline-day-column {
-    border-left: 1px solid #f1f5f9;
-    display: flex;
-    flex-direction: column;
-}
-.timeline-day-column:first-child {
-    border-left: none;
-}
-
-.timeline-day-column.is-today {
-    background-color: #f0fbfd;
-}
-
-.timeline-hour-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 4px;
-    padding: 2px 6px;
-    border-bottom: 1px dashed #f4f6f8;
-    box-sizing: border-box;
-}
-
-.timeline-hour-row.is-empty {
-    min-height: 9px;
-    opacity: 0.55;
-}
-.timeline-hour-row.is-empty .timeline-hour-label {
-    font-size: 8px;
-    color: #cbd5e1;
-    padding-top: 0;
-}
-
-.timeline-hour-row.has-content {
-    min-height: 40px;
-    padding: 5px 6px;
-}
-
-.timeline-hour-label {
-    flex-shrink: 0;
-    width: 30px;
+.timeline-hour-label-cell {
     font-size: 10px;
     color: #94a3b8;
-    padding-top: 2px;
+    padding: 3px 4px 0 0;
+    text-align: right;
     box-sizing: border-box;
+    border-top: 1px dashed #f4f6f8;
+}
+.timeline-hour-label-cell.is-empty {
+    color: #cbd5e1;
+    font-size: 8px;
 }
 
-.timeline-hour-content {
-    flex: 1;
-    min-width: 0;
+.timeline-day-cell {
+    border-top: 1px dashed #f4f6f8;
+    border-left: 1px solid #f1f5f9;
+    padding: 3px 4px;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
+    min-height: 9px;
+}
+.timeline-day-cell.is-today {
+    background-color: #f0fbfd;
+}
+.timeline-day-cell.is-empty {
+    opacity: 0.55;
+}
+
+/* 同一件事情從這一格延續到下一格：這一格底部、下一格頂部都不留內距，
+   讓上下兩段直接貼在一起，看起來像同一塊連續的色塊，不會有明顯間隙。 */
+.timeline-day-cell.continues-below {
+    padding-bottom: 0;
+}
+.timeline-day-cell.continued-from-above {
+    padding-top: 0;
+    border-top: none;
 }
 
 .timeline-block {
@@ -280,12 +268,23 @@
     filter: brightness(0.96);
 }
 
-/* 一筆紀錄橫跨好幾個小時格時，非開始格的那幾格只畫一條同色的延續色條，把整格填滿，不重複顯示文字 */
+/* 這一段是紀錄的開始，但還會繼續延續到下一小時：底部先不畫圓角，等下面的延續色條收尾 */
+.timeline-block.segment-start-continues {
+    border-radius: 6px 6px 0 0;
+}
+
+/* 一筆紀錄橫跨好幾個小時格時，非開始格的那幾格只畫一條同色的延續色條，把整格填滿，不重複顯示文字，
+   預設是方形（不畫圓角），確保跟上一段之間完全無縫銜接 */
 .timeline-block-continued {
     padding: 0;
     min-height: 30px;
     box-shadow: none;
-    border-radius: 4px;
+    border-radius: 0;
+    flex: 1;
+}
+/* 這一段剛好是這筆紀錄的最後一段：底部畫圓角收尾 */
+.timeline-block-continued.segment-end {
+    border-radius: 0 0 6px 6px;
 }
 
 .timeline-block-time {
@@ -340,11 +339,11 @@
     }
 
     .timeline-grid-header {
-        grid-template-columns: repeat(7, minmax(72px, 1fr));
+        grid-template-columns: 34px repeat(7, minmax(64px, 1fr));
         overflow-x: auto;
     }
     .timeline-grid-body {
-        grid-template-columns: repeat(7, minmax(72px, 1fr));
+        grid-template-columns: 34px repeat(7, minmax(64px, 1fr));
     }
 
     .timeline-grid-scroll {
