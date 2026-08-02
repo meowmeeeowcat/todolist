@@ -4,25 +4,42 @@
 // 是兩套各自實作的週數計算邏輯，容易改一邊忘了改另一邊而產生不一致。
 // 現在統一只有一套核心邏輯：getWeekNumberByDate(dateStr)，
 // getWeekNumberFor2026(monthIndex, day) 只是轉成日期字串後呼叫它。
+//
+// 年份不再寫死是 2026：getCurrentAppYear() 會動態抓「現在」對應到的年份（用凌晨4點重置後的有效日期），
+// 這樣跨年之後，日期字串、週次計算、年曆格子的星期對齊都會自動換成新的一年，不用改程式碼、也不用手動處理。
 
 const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+// 目前應該使用的年份：每次呼叫都重新抓一次系統時間，確保網頁開很久、剛好跨過年也能抓到最新的年份
+function getCurrentAppYear() {
+    const now = (typeof getEffectiveNow === 'function') ? getEffectiveNow() : new Date();
+    return now.getFullYear();
+}
+
+// 這一年的 1 月 1 日是星期幾，轉成「週一＝0…週日＝6」的索引，年曆格子排版跟週次計算都要用這個，
+// 不能寫死成某一年的固定值，否則跨年之後 1 月 1 日星期幾不一樣，年曆格子就會全部對不齊。
+function getJan1WeekdayIndex(year) {
+    const jan1 = new Date(year, 0, 1);
+    return (jan1.getDay() + 6) % 7;
+}
 
 function formatDateString(mIdx, d) {
     const mm = String(mIdx + 1).padStart(2, '0');
     const dd = String(d).padStart(2, '0');
-    return `2026-${mm}-${dd}`;
+    return `${getCurrentAppYear()}-${mm}-${dd}`;
 }
 
-// 核心週數計算：輸入 "2026-MM-DD"，回傳 "第 X 週"（超出 2026 或範圍外回傳 null）
+// 核心週數計算：輸入 "YYYY-MM-DD"，回傳 "第 X 週"（範圍外回傳 null）
 function getWeekNumberByDate(dateStr) {
     if (!dateStr) return null;
     const d = new Date(dateStr);
-    if (d.getFullYear() !== 2026) return null;
+    if (isNaN(d.getTime())) return null;
     let totalDays = d.getDate();
     for (let i = 0; i < d.getMonth(); i++) {
         totalDays += daysInMonths[i];
     }
-    const w = Math.ceil((totalDays + 3) / 7);
+    const offset = getJan1WeekdayIndex(d.getFullYear());
+    const w = Math.ceil((totalDays + offset) / 7);
     return (w >= 1 && w <= 53) ? `第 ${w} 週` : null;
 }
 

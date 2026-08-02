@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://www.gstatic.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
-    <title>每週必做事項與年度年曆看板</title>
+    <title>Todolist</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/calendar.css">
     <link rel="stylesheet" href="css/timeline.css">
@@ -13,7 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js" defer></script>
-    <link rel="icon" href="data:,">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23f1f5f9'/%3E%3Cpath d='M16,16 L16,1 A15,15 0 0,1 28.99,23.5 Z' fill='%23ffb3ba'/%3E%3Cpath d='M16,16 L28.99,23.5 A15,15 0 0,1 3.01,23.5 Z' fill='%23bae1ff'/%3E%3Cpath d='M16,16 L3.01,23.5 A15,15 0 0,1 16,1 Z' fill='%23baffc9'/%3E%3C/svg%3E">
 </head>
 
 <body>
@@ -97,7 +97,7 @@
                     <h3>臨時待辦</h3>
                     <div>
                         <button id="open-add-temp-modal-btn" style="padding: 6px 12px; font-size: 13px;">新增</button>
-                        <button id="open-temp-edit-modal-btn" style="padding: 6px 12px; font-size: 13px; background-color: #ff9f43;">編輯模式</button>
+                        <button id="open-temp-edit-modal-btn" class="macaron-btn-navy" style="padding: 6px 12px; font-size: 13px;">編輯模式</button>
                         <button id="open-temp-history-btn" style="padding: 6px 12px; font-size: 13px; background-color: #64748b;">歷史紀錄</button>
                     </div>
                 </div>
@@ -134,8 +134,8 @@
     <!-- ================= 年度總覽頁（預設隱藏，切換時才顯示） ================= -->
     <div id="view-calendar" class="container calendar-main-container hidden">
         <div class="control-panel">
-            <h2>2026年的統計</h2>
-            <button id="nav-back-btn" class="page-back-btn" onclick="switchPage('todo')" title="返回主頁">← <span class="page-back-btn-text">返回主圖表頁</span></button>
+            <h2 id="calendar-year-title">2026年的統計</h2>
+            <button id="nav-back-btn" class="page-back-btn" onclick="switchPage('todo')" title="返回主頁"><span class="page-back-arrow">←</span> <span class="page-back-btn-text">返回主圖表頁</span></button>
         </div>
 
         <div class="calendar-top-dashboard">
@@ -172,7 +172,7 @@
     <div id="view-timeline" class="container timeline-main-container hidden">
         <div class="control-panel">
             <h2>每日時間線</h2>
-            <button class="page-back-btn" onclick="switchPage('todo')" title="返回主頁">← <span class="page-back-btn-text">返回主頁</span></button>
+            <button class="page-back-btn" onclick="switchPage('todo')" title="返回主頁"><span class="page-back-arrow">←</span> <span class="page-back-btn-text">返回主頁</span></button>
         </div>
 
         <div class="timeline-dashboard">
@@ -216,9 +216,11 @@
                     <button id="timeline-today-btn" class="annual-overview-btn">回到本週</button>
                 </div>
 
-                <div id="timeline-grid-header" class="timeline-grid-header"></div>
-                <div class="timeline-grid-scroll">
-                    <div id="timeline-grid-body" class="timeline-grid-body"></div>
+                <div class="timeline-grid-hscroll">
+                    <div id="timeline-grid-header" class="timeline-grid-header"></div>
+                    <div class="timeline-grid-vscroll">
+                        <div id="timeline-grid-body" class="timeline-grid-body"></div>
+                    </div>
                 </div>
             </div>
         </div>

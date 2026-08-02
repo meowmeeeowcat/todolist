@@ -34,12 +34,31 @@ function getCategoryPaletteOrder(groupName) {
     return 999;
 }
 
-// 計算「2026-01-01」到某個月份第 1 天之間，累積了幾天，藉此推算出該月 1 號是星期幾
-// （週一為索引 0 ...週日為索引 6；2026-01-01 是週四，索引為 3）
+// 給臨時任務／計時紀錄排序用：這些項目的顏色直接存在資料上（十六進位色碼或 hsl(...) 格式），
+// 不是查大類別名稱，所以要直接比對顏色值本身在馬卡龍色盤裡排第幾個。
+function getColorPaletteOrder(colorValue) {
+    if (!colorValue || !window.fixedPalette) return 999;
+    let idx = window.fixedPalette.findIndex(p => p.color === colorValue);
+    if (idx !== -1) return idx;
+    const match = /hsl\((\d+)/.exec(colorValue);
+    if (match) {
+        const hue = parseInt(match[1], 10);
+        idx = window.fixedPalette.findIndex(p => p.hue === hue);
+        if (idx !== -1) return idx;
+    }
+    return 999;
+}
+
+// 計算某年 1 月 1 日到某個月份第 1 天之間累積了幾天，藉此推算出該月 1 號是星期幾
+// （週一為索引 0 ...週日為索引 6；1 月 1 日實際是星期幾用 date-utils.js 的 getJan1WeekdayIndex 動態算）
+// 計算某個月份第 1 天之間，累積了幾天，藉此推算出該月 1 號是星期幾。
+// 起始偏移量用「今年」1月1日實際是星期幾動態算出來（見 date-utils.js 的 getJan1WeekdayIndex），
+// 不寫死成特定某一年的固定值，這樣跨年之後年曆格子還是會正確對齊。
 function getMonthStartWeekdayIndex(monthIndex) {
     let totalDaysBefore = 0;
     for (let i = 0; i < monthIndex; i++) totalDaysBefore += daysInMonths[i];
-    return (3 + totalDaysBefore) % 7;
+    const offset = getJan1WeekdayIndex(getCurrentAppYear());
+    return (offset + totalDaysBefore) % 7;
 }
 
 function rateToClass(rate) {
@@ -170,9 +189,11 @@ function showDateDetails(dateStr, weekKey) {
     const weekData = weeklyDataStore[weekKey] || {};
     let html = "";
 
-    html += `<h4 style="margin: 5px 0; color: #1a4d6c;">當天專屬臨時任務：</h4>`;
+    html += `<h4 style="margin: 5px 0; color: #1a4d6c;">臨時任務</h4>`;
     const tempTasksList = globalAppData.tempTasks || [];
-    const specificTempTasks = tempTasksList.filter(t => t.date === dateStr);
+    const specificTempTasks = tempTasksList
+        .filter(t => t.date === dateStr)
+        .sort((a, b) => getColorPaletteOrder(a.color) - getColorPaletteOrder(b.color));
     
     if (specificTempTasks.length === 0) {
         html += `<div class="detail-item" style="color:#777; font-style:italic;">本日無排定臨時指派任務。</div>`;
@@ -187,10 +208,10 @@ function showDateDetails(dateStr, weekKey) {
         });
     }
 
-    html += `<h4 style="margin: 15px 0 5px 0; color: #1a4d6c;">當天計時紀錄：</h4>`;
+    html += `<h4 style="margin: 15px 0 5px 0; color: #1a4d6c;">計時紀錄</h4>`;
     const daySessions = (globalAppData.timelineSessions || [])
         .filter(s => s.date === dateStr)
-        .sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
+        .sort((a, b) => getColorPaletteOrder(typeof getTimelineSessionColor === 'function' ? getTimelineSessionColor(a) : a.color) - getColorPaletteOrder(typeof getTimelineSessionColor === 'function' ? getTimelineSessionColor(b) : b.color));
 
     if (daySessions.length === 0) {
         html += `<div class="detail-item" style="color:#777; font-style:italic;">當天尚無計時紀錄。</div>`;
@@ -216,9 +237,10 @@ function showDateDetails(dateStr, weekKey) {
         html += `<div style="font-size:13px; color:#475569; margin: 4px 0 0 0;">當天累計：${dayTotalText}</div>`;
     }
 
-    html += `<h4 style="margin: 15px 0 5px 0; color: #1a4d6c;">所屬週次各大項累積進度：</h4>`;
+    html += `<h4 style="margin: 15px 0 5px 0; color: #1a4d6c;">累積進度</h4>`;
     let hasRegular = false;
-    for (let mainKey in weekData) {
+    const sortedMainKeys = Object.keys(weekData).sort((a, b) => getCategoryPaletteOrder(a) - getCategoryPaletteOrder(b));
+    sortedMainKeys.forEach(mainKey => {
         hasRegular = true;
         const mainItem = weekData[mainKey];
         const percent = mainItem.total > 0 ? Math.round((mainItem.completed / mainItem.total) * 100) : 0;
@@ -230,7 +252,7 @@ function showDateDetails(dateStr, weekKey) {
                 <b>${mainKey}</b>: ${mainItem.completed}/${mainItem.total} 次 (${percent}%)
             </div>
         `;
-    }
+    });
     if(!hasRegular) html += `<div style="color:#999; font-size:14px;">本週無任何常規任務。</div>`;
     if (detailsEl) detailsEl.innerHTML = html;
 }
@@ -290,18 +312,16 @@ function calculateAnnualSummaryStats() {
 function initCalendarGrid() {
     // 「今天」是凌晨 4 點重置後的有效日期，不是單純的日曆日期（凌晨 0～3 點還算前一天）
     const systemDate = getEffectiveNow();
-    let todayStr = "2026-07-11"; 
-    let systemWeekKey = "第 28 週";
-    let todayMonthIndex = 6; // 對應預設的 2026-07-11（7月，索引 6）
+    const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(systemDate.getDate()).padStart(2, '0');
+    const todayStr = `${systemDate.getFullYear()}-${mm}-${dd}`;
+    const wNum = getWeekNumberFor2026(systemDate.getMonth(), systemDate.getDate());
+    const systemWeekKey = `第 ${wNum} 週`;
+    const todayMonthIndex = systemDate.getMonth();
 
-    if (systemDate.getFullYear() === 2026) {
-        const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(systemDate.getDate()).padStart(2, '0');
-        todayStr = `2026-${mm}-${dd}`;
-        const wNum = getWeekNumberFor2026(systemDate.getMonth(), systemDate.getDate());
-        systemWeekKey = `第 ${wNum} 週`;
-        todayMonthIndex = systemDate.getMonth();
-    }
+    // 頁面標題的年份文字也跟著目前的年份走，跨年之後會自動換成新的一年
+    const yearTitleEl = document.getElementById('calendar-year-title');
+    if (yearTitleEl) yearTitleEl.innerText = `${getCurrentAppYear()}年的統計`;
 
     selectedDateStr = todayStr;
     cachedTodayStr = todayStr;

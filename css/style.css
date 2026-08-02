@@ -526,13 +526,14 @@ button:hover {
 }
 
 .edit-btn {
-    background-color: #ff9f43;
+    background-color: #c5cbff;
+    color: white;
     padding: 4px 8px;
     font-size: 12px;
     border-radius: 4px;
 }
 .edit-btn:hover {
-    background-color: #ee8a2e;
+    background-color: #aab0f5;
 }
 
 .delete-btn {
@@ -545,7 +546,7 @@ button:hover {
     background-color: #d63031;
 }
 .archive-btn {
-    background-color: #10b981; /* 綠色代表完成結案 */
+    background-color: #7fd9a0; /* 馬卡龍薄荷綠系，代表完成結案 */
     color: white;
     padding: 4px 8px;
     font-size: 12px;
@@ -555,7 +556,7 @@ button:hover {
     font-weight: bold;
 }
 .archive-btn:hover {
-    background-color: #059669;
+    background-color: #5fc487;
 }
 
 /* ================= 登入 / 註冊畫面 ================= */
@@ -685,26 +686,28 @@ button:hover {
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: #ee5253;
-    color: white;
+    background: white;
+    color: #ee5253;
+    border: 2px solid #ffb3ba;
     font-size: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    box-shadow: 0 4px 14px rgba(238, 82, 83, 0.4);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
     transition: transform 0.15s ease;
 }
 .pomodoro-fab-btn:hover {
-    background: #d63031;
+    background: #fff5f5;
     transform: scale(1.06);
 }
 .pomodoro-fab-btn.is-running {
+    border-color: #ee5253;
     animation: pomodoro-fab-pulse 1.4s ease-in-out infinite;
 }
 .pomodoro-fab-btn.is-paused {
-    background: #94a3b8;
-    box-shadow: 0 4px 14px rgba(148, 163, 184, 0.4);
+    border-color: #94a3b8;
+    box-shadow: 0 4px 14px rgba(148, 163, 184, 0.3);
 }
 @keyframes pomodoro-fab-pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(238, 82, 83, 0.5); }
@@ -939,6 +942,16 @@ button:hover {
     }
     .page-back-btn-text {
         display: none;
+    }
+    /* 手機版箭頭改指向右邊：原本的「←」文字用 font-size:0 縮到看不見，
+       偽元素上另外顯示一個「→」字元並蓋回原本的字級，兩者疊在同一個位置上 */
+    .page-back-arrow {
+        font-size: 0;
+        position: relative;
+    }
+    .page-back-arrow::before {
+        content: '→';
+        font-size: 16px;
     }
 
     .chart-wrapper {

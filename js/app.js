@@ -71,19 +71,16 @@ if (openTempEditModalBtn) {
     });
 }
 
-// 今天的日期字串（2026 年格式），系統年份不是 2026 時退而回傳固定預設值
-// 這裡的「今天」是凌晨 4 點重置後的有效日期，不是單純的日曆日期（凌晨 0～3 點還算前一天）
+// 今天的日期字串（YYYY-MM-DD 格式，凌晨4點重置後的有效日期），年份直接跟著系統目前的年份走，
+// 跨年之後會自動變成新的一年，不再限定只有 2026 年才算得出來
 function getTodayDateStr2026() {
     const systemDate = getEffectiveNow();
-    if (systemDate.getFullYear() === 2026) {
-        const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(systemDate.getDate()).padStart(2, '0');
-        return `2026-${mm}-${dd}`;
-    }
-    return '2026-01-01';
+    const mm = String(systemDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(systemDate.getDate()).padStart(2, '0');
+    return `${systemDate.getFullYear()}-${mm}-${dd}`;
 }
 
-// 今天所屬的週次（"第 X 週"），算不出來（系統年份不是 2026）就回傳 null
+// 今天所屬的週次（"第 X 週"）
 function getTodayWeekKey() {
     return getWeekNumberByDate(getTodayDateStr2026());
 }

@@ -159,6 +159,12 @@
     margin-bottom: 10px;
 }
 
+/* 表頭跟表身現在包在同一個水平捲動容器裡（.timeline-grid-hscroll），滑動日期時小時格子會一起動，
+   桌面版寬度夠用不需要橫向捲動；手機版才會啟用（見下方媒體查詢），並讓小時標籤欄改成釘在右側。 */
+.timeline-grid-hscroll {
+    overflow-x: visible;
+}
+
 .timeline-grid-header {
     display: grid;
     grid-template-columns: 40px repeat(7, 1fr);
@@ -198,7 +204,7 @@
     color: white;
 }
 
-.timeline-grid-scroll {
+.timeline-grid-vscroll {
     max-height: 65vh;
     overflow-y: auto;
     border: 1px solid #f1f5f9;
@@ -338,16 +344,28 @@
         width: 100%;
     }
 
-    .timeline-grid-header {
-        grid-template-columns: 34px repeat(7, minmax(64px, 1fr));
+    /* 手機版才需要橫向捲動（7天塞不進螢幕寬度），表頭跟表身現在包在同一個捲動容器裡，
+       滑動的時候日期跟下面的格子會綁在一起動，不會各滑各的。 */
+    .timeline-grid-hscroll {
         overflow-x: auto;
-    }
-    .timeline-grid-body {
-        grid-template-columns: 34px repeat(7, minmax(64px, 1fr));
     }
 
-    .timeline-grid-scroll {
-        overflow-x: auto;
+    /* 小時標籤欄改排到最右邊（用 order，不用改 HTML 順序），並且用 sticky 釘住，
+       不管橫向滑到哪一天，右側都看得到現在是幾點。 */
+    .timeline-grid-header,
+    .timeline-grid-body {
+        grid-template-columns: repeat(7, minmax(64px, 1fr)) 34px;
+    }
+    .timeline-hour-label-cell,
+    .timeline-gutter-spacer {
+        order: 8;
+        position: sticky;
+        right: 0;
+        z-index: 5;
+        background: white;
+    }
+
+    .timeline-grid-vscroll {
         max-height: 60vh;
     }
 
