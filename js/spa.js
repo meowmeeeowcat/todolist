@@ -17,6 +17,12 @@ function switchPage(page) {
     calendarView.classList.add('hidden');
     if (timelineView) timelineView.classList.add('hidden');
 
+    // 離開主頁去別的頁面時，加權模式、編輯模式都要跟著自動退出，回到主頁時才會是乾淨的預設畫面，
+    // 不會卡在「加權比例調整」或編輯模式裡
+    if (page !== 'todo' && typeof resetMainPageTransientState === 'function') {
+        resetMainPageTransientState();
+    }
+
     if (page === 'calendar') {
         if (!window.dataLoaded) { todoView.classList.remove('hidden'); return; } // 資料還沒載入完成前，按鈕本身也是 disabled 狀態
         calendarView.classList.remove('hidden');

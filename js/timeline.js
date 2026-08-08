@@ -284,8 +284,11 @@ function renderManualLogCategorySelector() {
     if (catKeys.includes(prevValue)) catSel.value = prevValue;
 
     manualLogFillSubSelect();
-    catSel.onchange = manualLogSyncFromCategory;
-    subSel.onchange = manualLogSyncFromCategory;
+    catSel.onchange = () => {
+        manualLogFillSubSelect(); // 大類別變了，分項選單要重新產生
+        manualLogSyncFromCategory();
+    };
+    subSel.onchange = manualLogSyncFromCategory; // 只是選分項，不用重建選單
 }
 
 function manualLogFillSubSelect() {
@@ -307,11 +310,12 @@ function manualLogFillSubSelect() {
     subSel.innerHTML = `<option value="">— 選擇分項 —</option>` + subKeys.map(k => `<option value="${k}">${k}</option>`).join('');
 }
 
-// 選了大類別／分項時：分項選單跟著更新，並且只要選了「現有大類別」，顏色就鎖定跟著該類別走（不開放自己改）；
+// 選了大類別／分項時：只要選了「現有大類別」，顏色就鎖定跟著該類別走（不開放自己改）；
 // 沒選大類別（自訂項目）的話，顏色恢復成可以自由挑選。分項名稱有選到的話，也會自動幫忙帶入顯示名稱。
+// 注意：這裡「不會」重建分項選單（不呼叫 manualLogFillSubSelect），
+// 因為選分項本身也會觸發這個函式，如果在這裡重建分項選單，會把使用者剛選好的分項洗掉、變成選不了分項。
+// 分項選單只有在「大類別改變」的時候才需要重建，呼叫端要自己在那個時機呼叫 manualLogFillSubSelect()。
 function manualLogSyncFromCategory() {
-    manualLogFillSubSelect();
-
     const catSel = document.getElementById('manual-log-category-select');
     const subSel = document.getElementById('manual-log-subitem-select');
     const nameInput = document.getElementById('manual-log-name');
@@ -386,8 +390,9 @@ function openManualLogEditor(sessionId) {
     const cancelBtn = document.getElementById('manual-log-cancel-btn');
 
     if (catSel) catSel.value = session.categoryKey || '';
-    manualLogSyncFromCategory(); // 連動更新分項選單、顏色鎖定狀態
+    manualLogFillSubSelect(); // 根據大類別重建分項選單
     if (subSel) subSel.value = session.subKey || '';
+    manualLogSyncFromCategory(); // 分項已經選好了，這裡只更新顏色鎖定狀態，不會重建選單、不會洗掉分項
     if (nameInput) nameInput.value = session.name || '';
     if (dateInput) dateInput.value = session.date || '';
     if (startInput) startInput.value = timelineMinutesToTimeInputValue(session.startMinutes || 0);

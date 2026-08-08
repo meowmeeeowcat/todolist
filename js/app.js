@@ -60,7 +60,17 @@ function setTodoEditingMode(active) {
 function setTempEditingMode(active) {
     const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
     if (tempListWrapperEl) tempListWrapperEl.classList.toggle('editing-mode', active);
-    if (openTempEditModalBtn) openTempEditModalBtn.innerText = active ? '返回' : '編輯模式';
+    if (openTempEditModalBtn) openTempEditModalBtn.innerText = active ? '返回' : '編輯';
+}
+
+// 離開主頁（切到年曆頁或時間線頁）時呼叫：把加權模式、編輯模式都退回主頁的預設畫面，
+// 這樣下次回到主頁時，看到的都是乾淨的項目清單總覽，不會卡在加權比例調整或編輯模式裡。
+function resetMainPageTransientState() {
+    currentView = 'main';
+    currentSubKey = null;
+    if (openWeightViewBtn) openWeightViewBtn.innerText = '加權';
+    setTodoEditingMode(false);
+    setTempEditingMode(false);
 }
 
 if (openTempEditModalBtn) {
@@ -98,7 +108,8 @@ function saveDataToStorage() {
         template: globalAppData.template,
         progress: globalAppData.progress,
         tempTasks: tempTasksArrayToObject(globalAppData.tempTasks),
-        timelineSessions: timelineSessionsArrayToObject(globalAppData.timelineSessions || [])
+        timelineSessions: timelineSessionsArrayToObject(globalAppData.timelineSessions || []),
+        tempFolders: tempFoldersArrayToObject(globalAppData.tempFolders || [])
     })
         .then(() => console.log("資料同步成功"))
         .catch(err => console.error("同步失敗:", err));
@@ -128,6 +139,14 @@ function saveTempTasksTree() {
         .catch(err => console.error("臨時任務同步失敗:", err));
 }
 
+// 臨時代辦資料夾有變動時（新增/改名/刪除資料夾，或任務被拖進/拖出資料夾）呼叫
+function saveTempFoldersTree() {
+    if (!userDbRef) return;
+    userDbRef.child('tempFolders').set(tempFoldersArrayToObject(globalAppData.tempFolders || []))
+        .then(() => console.log("臨時資料夾同步成功"))
+        .catch(err => console.error("臨時資料夾同步失敗:", err));
+}
+
 // 每日時間線的計時紀錄有變動時（新增一段紀錄／刪除一段紀錄）才呼叫，寫入時同樣轉成用 id 當 key 的物件
 function saveTimelineSessions() {
     if (!userDbRef) return;
@@ -137,11 +156,23 @@ function saveTimelineSessions() {
 }
 
 // 常規任務「打卡 +1 / -1」：只動 progress/{週}/{任務名} 這一個節點，並用 transaction 防止競態覆寫
+// 常規任務「打卡 +1 / -1」：只動 progress/{年份}/{週}/{任務名} 這一個節點，並用 transaction 防止競態覆寫。
+// progress 底下先用年份分層，是為了讓「今年第5週」跟「明年第5週」分開存放，不會因為週次名稱相同就互相覆蓋掉。
 function syncRegularCounter(weekKey, taskName, delta) {
     if (!userDbRef) return;
-    userDbRef.child(`progress/${weekKey}/${taskName}`).transaction((current) => {
+    const year = getCurrentAppYear();
+    userDbRef.child(`progress/${year}/${weekKey}/${taskName}`).transaction((current) => {
         return Math.max((current || 0) + delta, 0);
     }).catch(err => console.error("計數同步失敗:", err));
+}
+
+// 取得（並在需要時建立）「今年」的 progress 物件，主頁打卡的加減按鈕都要透過這個函式操作，
+// 不要直接寫 globalAppData.progress[週次]，否則會漏掉年份分層，造成跨年後撞名互相覆蓋。
+function ensureYearProgress() {
+    const year = getCurrentAppYear();
+    if (!globalAppData.progress) globalAppData.progress = {};
+    if (!globalAppData.progress[year]) globalAppData.progress[year] = {};
+    return globalAppData.progress[year];
 }
 
 // 臨時任務「打卡 +1 / -1」：只動 tempTasks/{id}/completed 這一個節點，同樣用 transaction
@@ -150,6 +181,22 @@ function syncTempTaskCounter(taskId, delta) {
     userDbRef.child(`tempTasks/${taskId}/completed`).transaction((current) => {
         return Math.max((current || 0) + delta, 0);
     }).catch(err => console.error("臨時任務計數同步失敗:", err));
+}
+
+// 舊資料修正：年度分層規則上線之前，progress 是直接用「第 N 週」當第一層 key（沒有年份），
+// 這裡偵測到這種舊格式時，整包包成「今年」的資料，改成新的 progress/{年份}/{週}/{任務} 結構。
+function migrateProgressToYearNamespace() {
+    const progress = globalAppData.progress;
+    if (!progress || typeof progress !== 'object') {
+        globalAppData.progress = {};
+        return;
+    }
+    const looksLegacyFlat = Object.keys(progress).some(k => k.indexOf('第') === 0);
+    if (looksLegacyFlat) {
+        const year = getCurrentAppYear();
+        globalAppData.progress = { [year]: progress };
+        saveProgressTree(); // 遷移完就寫回去，避免下次讀取時又要重新判斷一次
+    }
 }
 
 function loadDataFromStorage() {
@@ -164,11 +211,14 @@ function loadDataFromStorage() {
             globalAppData.tempTasks = tempTasksObjectToArray(globalAppData.tempTasks);
             // timelineSessions 同樣統一轉回本機用的陣列（舊帳號可能根本沒有這個欄位）
             globalAppData.timelineSessions = timelineSessionsObjectToArray(globalAppData.timelineSessions);
+            // tempFolders 同樣統一轉回本機用的陣列（舊帳號可能根本沒有這個欄位）
+            globalAppData.tempFolders = tempFoldersObjectToArray(globalAppData.tempFolders);
         } else {
-            globalAppData = { template: {}, tempTasks: [], progress: {}, timelineSessions: [] };
+            globalAppData = { template: {}, tempTasks: [], progress: {}, timelineSessions: [], tempFolders: [] };
             saveDataToStorage(); // 全新使用者，第一次整包寫入是合理的
         }
         window.globalAppData = globalAppData;
+        migrateProgressToYearNamespace();
         if (typeof migrateOldTimelineSessionsFor4amReset === 'function') {
             migrateOldTimelineSessionsFor4amReset();
         }
@@ -342,7 +392,7 @@ function closeModal() {
     const tempListWrapperEl = document.getElementById('temp-task-list-wrapper');
     if (tempListWrapperEl) tempListWrapperEl.classList.remove('editing-mode');
     if (openEditModalBtn) openEditModalBtn.innerText = '編輯';
-    if (openTempEditModalBtn) openTempEditModalBtn.innerText = '編輯模式';
+    if (openTempEditModalBtn) openTempEditModalBtn.innerText = '編輯';
 }
 
 openAddModalBtn.addEventListener('click', () => {
@@ -353,6 +403,89 @@ const openAddTempModalBtn = document.getElementById('open-add-temp-modal-btn');
 if (openAddTempModalBtn) {
     openAddTempModalBtn.addEventListener('click', () => {
         openModal("新增臨時待辦事項", 'temporary');
+    });
+}
+
+// ================= 臨時代辦資料夾：連動到某個大類別的分項 =================
+function renderTempFolderCategorySelector() {
+    const catSel = document.getElementById('temp-folder-category-select');
+    const subSel = document.getElementById('temp-folder-subitem-select');
+    if (!catSel || !subSel) return;
+
+    const catKeys = Object.keys(globalAppData.template || {}).filter(k => !globalAppData.template[k].archived);
+    catSel.innerHTML = catKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+
+    function fillSub() {
+        const catKey = catSel.value;
+        const cat = globalAppData.template[catKey];
+        const subItems = (cat && cat.subItems) || {};
+        const subKeys = Object.keys(subItems).filter(k => !subItems[k].archived);
+        subSel.innerHTML = subKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+        autoFillFolderName();
+    }
+    function autoFillFolderName() {
+        const nameInput = document.getElementById('temp-folder-name');
+        if (nameInput && !nameInput.value) nameInput.value = subSel.value;
+    }
+
+    fillSub();
+    catSel.onchange = fillSub;
+    subSel.onchange = autoFillFolderName;
+}
+
+function openTempFolderModal() {
+    const modal = document.getElementById('temp-folder-modal');
+    if (!modal) return;
+    const nameInput = document.getElementById('temp-folder-name');
+    if (nameInput) nameInput.value = '';
+    renderTempFolderCategorySelector();
+    modal.classList.remove('hidden');
+}
+
+function closeTempFolderModal() {
+    const modal = document.getElementById('temp-folder-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function submitTempFolder() {
+    const catSel = document.getElementById('temp-folder-category-select');
+    const subSel = document.getElementById('temp-folder-subitem-select');
+    const nameInput = document.getElementById('temp-folder-name');
+
+    const catKey = catSel ? catSel.value : '';
+    const subKey = subSel ? subSel.value : '';
+    if (!catKey || !subKey) {
+        alert('請先選擇要連動的大類別與分項');
+        return;
+    }
+    const name = (nameInput && nameInput.value || '').trim() || subKey;
+
+    if (!globalAppData.tempFolders) globalAppData.tempFolders = [];
+    globalAppData.tempFolders.push({
+        id: 'folder_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        name: name,
+        categoryKey: catKey,
+        subKey: subKey,
+        color: getSafeMacaronColor(catKey, '#bae1ff')
+    });
+    saveTempFoldersTree();
+    closeTempFolderModal();
+    updateView();
+}
+
+const openAddFolderModalBtn = document.getElementById('open-add-folder-modal-btn');
+if (openAddFolderModalBtn) openAddFolderModalBtn.addEventListener('click', openTempFolderModal);
+
+const closeTempFolderModalBtn = document.getElementById('close-temp-folder-modal-btn');
+if (closeTempFolderModalBtn) closeTempFolderModalBtn.addEventListener('click', closeTempFolderModal);
+
+const tempFolderSubmitBtn = document.getElementById('temp-folder-submit-btn');
+if (tempFolderSubmitBtn) tempFolderSubmitBtn.addEventListener('click', submitTempFolder);
+
+const tempFolderModalEl = document.getElementById('temp-folder-modal');
+if (tempFolderModalEl) {
+    tempFolderModalEl.addEventListener('click', (e) => {
+        if (e.target === tempFolderModalEl) closeTempFolderModal();
     });
 }
 
@@ -640,9 +773,10 @@ function renderTodoList(weekData) {
                 e.stopPropagation();
                 // 不限制打卡次數：規定次數以內是第一層，超過規定次數會依照跟原本規定次數的倍率，
                 // 自動累積成主頁圓餅圖的第二層（1~2 倍）、第三層（2~3 倍），可以一直打卡下去。
-                if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
-                if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
-                globalAppData.progress[currentWeek][originalKey]++;
+                const yearProgress = ensureYearProgress();
+                if (!yearProgress[currentWeek]) yearProgress[currentWeek] = {};
+                if (!yearProgress[currentWeek][originalKey]) yearProgress[currentWeek][originalKey] = 0;
+                yearProgress[currentWeek][originalKey]++;
                 syncRegularCounter(currentWeek, originalKey, 1);
                 updateView();
             });
@@ -650,9 +784,10 @@ function renderTodoList(weekData) {
             li.querySelector('.minus-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (subItem.completed > 0) {
-                    if (!globalAppData.progress[currentWeek]) globalAppData.progress[currentWeek] = {};
-                    if (!globalAppData.progress[currentWeek][originalKey]) globalAppData.progress[currentWeek][originalKey] = 0;
-                    globalAppData.progress[currentWeek][originalKey]--;
+                    const yearProgress = ensureYearProgress();
+                    if (!yearProgress[currentWeek]) yearProgress[currentWeek] = {};
+                    if (!yearProgress[currentWeek][originalKey]) yearProgress[currentWeek][originalKey] = 0;
+                    yearProgress[currentWeek][originalKey]--;
                     syncRegularCounter(currentWeek, originalKey, -1);
                     updateView();
                 }
@@ -687,7 +822,11 @@ function renderTodoList(weekData) {
                 e.stopPropagation();
                 if (!confirm("【全週同步刪除】這會將全年度所有週次的此任務刪除！確定嗎？")) return;
                 delete globalAppData.template[currentSubKey].subItems[originalKey];
-                for (let w in globalAppData.progress) { delete globalAppData.progress[w][originalKey]; }
+                for (let y in globalAppData.progress) {
+                    for (let w in globalAppData.progress[y]) {
+                        delete globalAppData.progress[y][w][originalKey];
+                    }
+                }
                 saveTemplate();
                 saveProgressTree();
                 updateView();
@@ -721,25 +860,62 @@ function getAllActiveTempTasks() {
     return tasks;
 }
 
+// 完成一筆臨時代辦：如果這筆代辦被放進某個資料夾（代表連動到某個分項），
+// 完成時要幫那個分項在「代辦日期所屬的那一週」自動 +1，同步寫回 Firebase 對應年份的節點。
+function completeTempTask(task) {
+    task.completed = 1;
+    task.archived = true;
+
+    if (task.folderId) {
+        const folder = (globalAppData.tempFolders || []).find(f => f.id === task.folderId);
+        if (folder && folder.categoryKey && folder.subKey) {
+            const taskWeekKey = getWeekNumberByDate(task.date);
+            const taskDateObj = task.date ? new Date(task.date) : null;
+            const taskYear = (taskDateObj && !isNaN(taskDateObj.getTime())) ? taskDateObj.getFullYear() : getCurrentAppYear();
+
+            if (taskWeekKey) {
+                if (!globalAppData.progress) globalAppData.progress = {};
+                if (!globalAppData.progress[taskYear]) globalAppData.progress[taskYear] = {};
+                if (!globalAppData.progress[taskYear][taskWeekKey]) globalAppData.progress[taskYear][taskWeekKey] = {};
+                if (!globalAppData.progress[taskYear][taskWeekKey][folder.subKey]) globalAppData.progress[taskYear][taskWeekKey][folder.subKey] = 0;
+                globalAppData.progress[taskYear][taskWeekKey][folder.subKey]++;
+
+                if (userDbRef) {
+                    userDbRef.child(`progress/${taskYear}/${taskWeekKey}/${folder.subKey}`).transaction((current) => {
+                        return Math.max((current || 0) + 1, 0);
+                    }).catch(err => console.error("連動分項計數同步失敗:", err));
+                }
+            }
+        }
+    }
+
+    saveTempTasksTree();
+    updateView();
+}
+
 // 渲染主頁旁邊的「臨時待辦」清單：這些任務不計入主頁的圖表/總覽統計，
 // 且不論任務日期是落在之前的週次、目前的週次還是未來的週次，只要還沒完成都會一直顯示在這裡。
+// 資料夾（tempFolders）連動到某個大類別的分項，把任務拖進資料夾、打勾完成時，該分項會自動 +1。
 function renderTempTaskList() {
     const container = document.getElementById('temp-task-list');
     if (!container) return;
     container.innerHTML = '';
 
     const tasks = getAllActiveTempTasks();
+    const folders = globalAppData.tempFolders || [];
 
-    if (tasks.length === 0) {
-        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">目前沒有進行中的臨時任務，點「新增」即可加入，不用選分類也不用填次數。</li>`;
+    if (tasks.length === 0 && folders.length === 0) {
+        container.innerHTML = `<li class="no-data-hint" style="list-style:none; padding:10px 0;">目前沒有進行中的臨時任務，點「新增」即可加入；也可以先按「新增資料夾」建立跟項目清單連動的資料夾。</li>`;
         return;
     }
 
-    tasks.forEach((task, index) => {
+    function buildTaskLi(task, index) {
         const li = document.createElement('li');
         li.className = 'todo-item';
         li.style.cursor = 'default';
         li.style.borderLeft = `5px solid ${task.color || '#94a3b8'}`;
+        li.draggable = true;
+        li.dataset.taskId = task.id;
 
         li.innerHTML = `
             <div class="todo-item-clickable-area">
@@ -759,6 +935,12 @@ function renderTempTaskList() {
             </span>
         `;
 
+        li.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', task.id);
+            li.classList.add('is-dragging');
+        });
+        li.addEventListener('dragend', () => li.classList.remove('is-dragging'));
+
         li.querySelector('.move-up-btn').addEventListener('click', () => {
             if (swapArrayOrder(globalAppData.tempTasks, tasks, task.id, -1, 'id')) {
                 saveTempTasksTree();
@@ -775,10 +957,7 @@ function renderTempTaskList() {
         // 勾選「完成」：直接完結並移入歷史紀錄，之後可以在歷史紀錄裡隨時加回來（不彈系統確認框，勾了就直接算數）
         li.querySelector('.temp-complete-checkbox').addEventListener('change', (e) => {
             if (!e.target.checked) return;
-            task.completed = 1;
-            task.archived = true;
-            saveTempTasksTree();
-            updateView();
+            completeTempTask(task);
         });
 
         li.querySelector('.edit-btn').addEventListener('click', () => {
@@ -804,8 +983,86 @@ function renderTempTaskList() {
             }
         });
 
-        container.appendChild(li);
+        return li;
+    }
+
+    // 先畫每個資料夾（含裡面已經放進去的任務），資料夾本身就是拖放區
+    folders.forEach(folder => {
+        const folderLi = document.createElement('li');
+        folderLi.className = 'temp-folder';
+        folderLi.style.borderLeft = `5px solid ${folder.color || '#bae1ff'}`;
+
+        const header = document.createElement('div');
+        header.className = 'temp-folder-header';
+        header.innerHTML = `
+            <span class="temp-folder-icon">📁</span>
+            <b>${folder.name}</b>
+            <span class="temp-folder-hint">→ ${folder.categoryKey} / ${folder.subKey}</span>
+            <button class="temp-folder-delete-btn" title="刪除資料夾（裡面的任務會回到未分類，不會被刪除）">&times;</button>
+        `;
+        folderLi.appendChild(header);
+
+        const innerList = document.createElement('ul');
+        innerList.className = 'temp-folder-tasks';
+
+        const folderTasks = tasks.filter(t => t.folderId === folder.id);
+        folderTasks.forEach(task => innerList.appendChild(buildTaskLi(task, tasks.indexOf(task))));
+        if (folderTasks.length === 0) {
+            const emptyHint = document.createElement('li');
+            emptyHint.className = 'temp-folder-empty-hint';
+            emptyHint.innerText = '把下面的臨時代辦拖到這裡';
+            innerList.appendChild(emptyHint);
+        }
+        folderLi.appendChild(innerList);
+
+        folderLi.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            folderLi.classList.add('is-drop-target');
+        });
+        folderLi.addEventListener('dragleave', () => folderLi.classList.remove('is-drop-target'));
+        folderLi.addEventListener('drop', (e) => {
+            e.preventDefault();
+            folderLi.classList.remove('is-drop-target');
+            const taskId = e.dataTransfer.getData('text/plain');
+            const draggedTask = (globalAppData.tempTasks || []).find(t => t.id === taskId);
+            if (draggedTask) {
+                draggedTask.folderId = folder.id;
+                saveTempTasksTree();
+                updateView();
+            }
+        });
+
+        header.querySelector('.temp-folder-delete-btn').addEventListener('click', () => {
+            if (!confirm(`確定要刪除資料夾「${folder.name}」嗎？裡面的臨時代辦會變回未分類，不會被刪除。`)) return;
+            (globalAppData.tempTasks || []).forEach(t => { if (t.folderId === folder.id) t.folderId = null; });
+            globalAppData.tempFolders = (globalAppData.tempFolders || []).filter(f => f.id !== folder.id);
+            saveTempFoldersTree();
+            saveTempTasksTree();
+            updateView();
+        });
+
+        container.appendChild(folderLi);
     });
+
+    // 沒有被放進任何資料夾（或資料夾已經被刪除）的任務，維持原本扁平清單的顯示方式
+    const unfiledTasks = tasks.filter(t => !t.folderId || !folders.some(f => f.id === t.folderId));
+    unfiledTasks.forEach(task => container.appendChild(buildTaskLi(task, tasks.indexOf(task))));
+
+    // 主清單本身也是拖放區：把任務從資料夾拖回這裡的空白處，就會變回未分類
+    container.ondragover = (e) => {
+        if (e.target === container) e.preventDefault();
+    };
+    container.ondrop = (e) => {
+        if (e.target !== container) return;
+        e.preventDefault();
+        const taskId = e.dataTransfer.getData('text/plain');
+        const draggedTask = (globalAppData.tempTasks || []).find(t => t.id === taskId);
+        if (draggedTask && draggedTask.folderId) {
+            draggedTask.folderId = null;
+            saveTempTasksTree();
+            updateView();
+        }
+    };
 }
 
 // ================= 臨時任務歷史紀錄（已完成的） =================
@@ -1185,10 +1442,12 @@ addTaskBtn.addEventListener('click', () => {
                     template[newName] = template[originalKey];
                     delete template[originalKey];
                     
-                    for (let w in globalAppData.progress) {
-                        if (globalAppData.progress[w][originalKey] !== undefined) {
-                            globalAppData.progress[w][newName] = globalAppData.progress[w][originalKey];
-                            delete globalAppData.progress[w][originalKey];
+                    for (let y in globalAppData.progress) {
+                        for (let w in globalAppData.progress[y]) {
+                            if (globalAppData.progress[y][w][originalKey] !== undefined) {
+                                globalAppData.progress[y][w][newName] = globalAppData.progress[y][w][originalKey];
+                                delete globalAppData.progress[y][w][originalKey];
+                            }
                         }
                     }
                 }

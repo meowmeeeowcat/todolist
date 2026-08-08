@@ -97,7 +97,8 @@
                     <h3>臨時待辦</h3>
                     <div>
                         <button id="open-add-temp-modal-btn" style="padding: 6px 12px; font-size: 13px;">新增</button>
-                        <button id="open-temp-edit-modal-btn" class="macaron-btn-navy" style="padding: 6px 12px; font-size: 13px;">編輯模式</button>
+                        <button id="open-add-folder-modal-btn" class="macaron-btn-navy" style="padding: 6px 12px; font-size: 13px;">新增資料夾</button>
+                        <button id="open-temp-edit-modal-btn" class="macaron-btn-navy" style="padding: 6px 12px; font-size: 13px;">編輯</button>
                         <button id="open-temp-history-btn" style="padding: 6px 12px; font-size: 13px; background-color: #64748b;">歷史紀錄</button>
                     </div>
                 </div>
@@ -133,9 +134,9 @@
 
     <!-- ================= 年度總覽頁（預設隱藏，切換時才顯示） ================= -->
     <div id="view-calendar" class="container calendar-main-container hidden">
-        <div class="control-panel">
+        <div class="control-panel page-header-panel">
             <h2 id="calendar-year-title">2026年的統計</h2>
-            <button id="nav-back-btn" class="page-back-btn" onclick="switchPage('todo')" title="返回主頁"><span class="page-back-arrow">←</span> <span class="page-back-btn-text">返回主圖表頁</span></button>
+            <button id="nav-back-btn" class="page-back-btn" onclick="switchPage('todo')" title="返回主頁"><span class="page-back-arrow">←</span> <span class="page-back-btn-text">返回主頁</span></button>
         </div>
 
         <div class="calendar-top-dashboard">
@@ -170,7 +171,7 @@
 
     <!-- ================= 每日時間線頁（預設隱藏，切換時才顯示） ================= -->
     <div id="view-timeline" class="container timeline-main-container hidden">
-        <div class="control-panel">
+        <div class="control-panel page-header-panel">
             <h2>每日時間線</h2>
             <button class="page-back-btn" onclick="switchPage('todo')" title="返回主頁"><span class="page-back-arrow">←</span> <span class="page-back-btn-text">返回主頁</span></button>
         </div>
@@ -273,6 +274,29 @@
                 <div style="width: 100%; display: flex; justify-content: flex-end; margin-top: 5px;">
                     <button id="add-task-btn">確認儲存</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 新增臨時代辦資料夾（連動到某個大類別的分項） ================= -->
+    <div id="temp-folder-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4>新增資料夾</h4>
+                <button class="close-modal-btn" id="close-temp-folder-modal-btn">&times;</button>
+            </div>
+            <p style="font-size:13px; color:#64748b; margin: 0 0 12px 0;">選擇要連動的大類別與分項，之後把臨時代辦拖進這個資料夾裡打勾完成時，該分項會自動 +1。</p>
+            <div class="form-row">
+                <select id="temp-folder-category-select"></select>
+            </div>
+            <div class="form-row">
+                <select id="temp-folder-subitem-select"></select>
+            </div>
+            <div class="form-row">
+                <input type="text" id="temp-folder-name" placeholder="資料夾名稱（可自訂，預設用分項名稱）">
+            </div>
+            <div style="width: 100%; display: flex; justify-content: flex-end; margin-top: 5px;">
+                <button id="temp-folder-submit-btn">建立資料夾</button>
             </div>
         </div>
     </div>

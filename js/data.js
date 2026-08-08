@@ -38,7 +38,8 @@ function calculateMainItems(weekKey) {
 
 function assembleWeeklyData(weekKey, template) {
     const progress = window.globalAppData.progress || {};
-    const weekProgress = progress[weekKey] || {}; 
+    const yearProgress = progress[getCurrentAppYear()] || {};
+    const weekProgress = yearProgress[weekKey] || {}; 
 
     for (let mainKey in template) {
         const mainItem = template[mainKey];
@@ -143,6 +144,20 @@ function timelineSessionsArrayToObject(arr) {
 }
 
 function timelineSessionsObjectToArray(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return Object.values(raw);
+}
+
+// ================= tempFolders（臨時代辦資料夾）儲存格式轉換 =================
+// 邏輯跟 tempTasks／timelineSessions 完全一樣：本機用陣列方便操作，寫回 Firebase 時轉成用 id 當 key 的物件。
+function tempFoldersArrayToObject(arr) {
+    const obj = {};
+    (arr || []).forEach(f => { obj[f.id] = f; });
+    return obj;
+}
+
+function tempFoldersObjectToArray(raw) {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
     return Object.values(raw);

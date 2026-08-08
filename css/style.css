@@ -259,6 +259,73 @@ select:focus, input:focus {
     min-height: 24px;
 }
 
+/* ================= 臨時代辦資料夾（連動大類別分項，可拖曳任務進去） ================= */
+.temp-folder {
+    list-style: none;
+    background: #f8fafc;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 10px 10px 6px 10px;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.temp-folder.is-drop-target {
+    background: #eef2ff;
+    box-shadow: inset 0 0 0 2px #c5cbff;
+}
+
+.temp-folder-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #1a4d6c;
+    padding-bottom: 6px;
+}
+.temp-folder-icon {
+    font-size: 15px;
+}
+.temp-folder-hint {
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: normal;
+}
+.temp-folder-delete-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.temp-folder-delete-btn:hover {
+    background: #ffe4e6;
+    color: #d94b56;
+}
+
+.temp-folder-tasks {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.temp-folder-tasks .todo-item {
+    margin-bottom: 6px;
+    margin-left: 8px;
+}
+
+.temp-folder-empty-hint {
+    color: #cbd5e1;
+    font-style: italic;
+    font-size: 13px;
+    padding: 6px 0 6px 8px;
+}
+
+.todo-item.is-dragging {
+    opacity: 0.4;
+}
+
 .todo-item:hover {
     background: #e6f7f7;
     transform: translateY(-1px);
@@ -329,6 +396,7 @@ select:focus, input:focus {
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
+    margin-left: auto;
 }
 .editing-mode .actions {
     display: flex !important;
@@ -537,13 +605,14 @@ button:hover {
 }
 
 .delete-btn {
-    background-color: #ee5253;
+    background-color: #ffb3ba;
+    color: white;
     padding: 4px 8px;
     font-size: 12px;
     border-radius: 4px;
 }
 .delete-btn:hover {
-    background-color: #d63031;
+    background-color: #ff9aa4;
 }
 .archive-btn {
     background-color: #7fd9a0; /* 馬卡龍薄荷綠系，代表完成結案 */
@@ -675,6 +744,10 @@ button:hover {
 }
 .page-back-btn:hover {
     background: #475569;
+}
+/* 電腦版不顯示箭頭，只留文字；手機版縮成圖示時才會在媒體查詢裡把箭頭打開 */
+.page-back-arrow {
+    display: none;
 }
 
 /* ================= 番茄鐘：右下角圓形浮動按鈕與彈出面板 ================= */
@@ -874,6 +947,13 @@ button:hover {
         gap: 10px;
     }
 
+    /* 年曆頁／時間線頁的控制列例外：維持橫排，讓標題跟返回鍵保持同一行、垂直置中對齊 */
+    .control-panel.page-header-panel {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
     /* 使用者暱稱／登出鍵放在週次選擇器上方 */
     .control-user-group {
         order: 1;
@@ -922,14 +1002,13 @@ button:hover {
         overflow-y: visible;
     }
 
-    /* 年曆頁／時間線頁的「返回主頁」按鈕縮成右上角的圓形圖示鍵，只留箭頭、不顯示文字，
+    /* 年曆頁／時間線頁的「返回主頁」按鈕在手機版縮成圓形圖示鍵，只留箭頭、不顯示文字；
+       改成留在 control-panel 原本的排版裡（不用 fixed 定位飄在畫面角落），
+       這樣才會跟標題文字保持在同一行、垂直置中對齊，而不是脫離版面單獨飄在角落。
        用 #nav-back-btn.page-back-btn 這種 id+class 組合選擇器，確保能蓋過 calendar.css 裡單純用 id 設定的樣式。 */
     .page-back-btn,
     #nav-back-btn.page-back-btn {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 1500;
+        flex-shrink: 0;
         width: 36px;
         height: 36px;
         padding: 0;
@@ -943,9 +1022,10 @@ button:hover {
     .page-back-btn-text {
         display: none;
     }
-    /* 手機版箭頭改指向右邊：原本的「←」文字用 font-size:0 縮到看不見，
-       偽元素上另外顯示一個「→」字元並蓋回原本的字級，兩者疊在同一個位置上 */
+    /* 手機版箭頭改指向右邊：桌面版預設不顯示箭頭，這裡先打開顯示，
+       再用 font-size:0 把原本的「←」文字縮到看不見，偽元素上另外顯示一個「→」字元蓋回原本的字級 */
     .page-back-arrow {
+        display: inline;
         font-size: 0;
         position: relative;
     }
@@ -1015,6 +1095,11 @@ button:hover {
     .control-panel {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .control-panel.page-header-panel {
+        flex-direction: row;
+        align-items: center;
     }
 
     .control-panel > div {
